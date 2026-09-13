@@ -25,8 +25,8 @@
         <input 
           type="text" 
           id="search-input" 
-          placeholder="Search recipes or paste URL..." 
-          class="w-full px-4 py-2 rounded-l-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+          placeholder="Search recipes or paste direct URL..." 
+          class="w-full px-4 py-2 rounded-l-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-300 text-sm"
           required
         />
         <button type="submit" class="bg-emerald-800 hover:bg-emerald-900 px-5 py-2 rounded-r-lg font-medium transition">
@@ -37,8 +37,23 @@
   </header>
 
   <!-- Main Container -->
-  <main class="max-w-5xl mx-auto px-4 mt-8">
+  <main class="max-w-5xl mx-auto px-4 mt-6">
     
+    <!-- Saved Sites & Quick Launch Bar -->
+    <section class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-globe text-emerald-600"></i> Saved Recipe Websites
+        </h2>
+        <button onclick="toggleSitesModal(true)" class="text-xs bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+          <i class="fa-solid fa-gear"></i> Manage Sites
+        </button>
+      </div>
+      <div id="saved-sites-pills" class="flex flex-wrap gap-2 text-xs">
+        <!-- Dynamically rendered site buttons -->
+      </div>
+    </section>
+
     <!-- Loading State -->
     <div id="loading" class="hidden text-center py-20">
       <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-emerald-600 border-t-transparent mb-4"></div>
@@ -78,7 +93,6 @@
 
       <!-- Recipe Content -->
       <div class="p-6 sm:p-10 grid grid-cols-1 md:grid-cols-3 gap-10">
-        
         <!-- Ingredients Column -->
         <div class="md:col-span-1 bg-slate-50 p-6 rounded-xl border border-slate-200 h-fit">
           <div class="flex justify-between items-center mb-4">
@@ -100,13 +114,108 @@
 
   </main>
 
+  <!-- Modal for Managing Websites -->
+  <div id="sites-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-sliders text-emerald-600 mr-2"></i>Manage Saved Recipe Websites</h3>
+        <button onclick="toggleSitesModal(false)" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+      </div>
+      
+      <!-- Add Site Form -->
+      <form onsubmit="addCustomSite(event)" class="mb-6 bg-slate-50 p-3 rounded-lg border border-slate-200">
+        <p class="text-xs font-semibold text-slate-600 mb-2">Add New Website</p>
+        <div class="space-y-2">
+          <input type="text" id="new-site-name" placeholder="Website Name (e.g. BBC Good Food)" class="w-full px-3 py-1.5 border rounded text-xs focus:ring-2 focus:ring-emerald-500 outline-none" required />
+          <input type="url" id="new-site-url" placeholder="URL (e.g. https://www.bbcgoodfood.com)" class="w-full px-3 py-1.5 border rounded text-xs focus:ring-2 focus:ring-emerald-500 outline-none" required />
+          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-1.5 rounded text-xs transition">Add Website</button>
+        </div>
+      </form>
+
+      <!-- Current Saved Sites List -->
+      <h4 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">Saved Websites</h4>
+      <ul id="modal-sites-list" class="space-y-2 max-h-48 overflow-y-auto pr-1"></ul>
+
+      <div class="mt-6 text-right">
+        <button onclick="toggleSitesModal(false)" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold px-4 py-2 rounded-lg">Done</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let isMetric = true;
     let currentRecipeData = null;
 
-    const CORS_PROXY = "https://corsproxy.io/?";
+    // Default target websites
+    const DEFAULT_SITES = [
+      { name: "BBC Good Food", url: "https://www.bbcgoodfood.com" },
+      { name: "Serious Eats", url: "https://www.seriouseats.com" },
+      { name: "Allrecipes", url: "https://www.allrecipes.com" },
+      { name: "Simply Recipes", url: "https://www.simplyrecipes.com" },
+      { name: "Jamie Oliver", url: "https://www.jamieoliver.com" },
+      { name: "Food Network", url: "https://www.foodnetwork.com" }
+    ];
 
-    // Common imperial unit conversion regex patterns
+    let savedSites = JSON.parse(localStorage.getItem('clean_recipe_saved_sites')) || DEFAULT_SITES;
+
+    function saveSites() {
+      localStorage.setItem('clean_recipe_saved_sites', JSON.stringify(savedSites));
+      renderSitesPills();
+      renderModalSitesList();
+    }
+
+    function renderSitesPills() {
+      const container = document.getElementById('saved-sites-pills');
+      container.innerHTML = '';
+      savedSites.forEach(site => {
+        const btn = document.createElement('a');
+        btn.href = site.url;
+        btn.target = "_blank";
+        btn.className = "bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 border border-slate-200 px-3 py-1 rounded-full transition flex items-center gap-1.5";
+        btn.innerHTML = `<i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> ${site.name}`;
+        container.appendChild(btn);
+      });
+    }
+
+    function renderModalSitesList() {
+      const list = document.getElementById('modal-sites-list');
+      list.innerHTML = '';
+      savedSites.forEach((site, index) => {
+        const li = document.createElement('li');
+        li.className = "flex justify-between items-center bg-slate-50 p-2 rounded text-xs border border-slate-200";
+        li.innerHTML = `
+          <div>
+            <span class="font-bold text-slate-800">${site.name}</span>
+            <span class="text-slate-400 block text-[10px]">${site.url}</span>
+          </div>
+          <button onclick="removeSite(${index})" class="text-red-500 hover:text-red-700 p-1"><i class="fa-solid fa-trash"></i></button>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function addCustomSite(e) {
+      e.preventDefault();
+      const name = document.getElementById('new-site-name').value.trim();
+      const url = document.getElementById('new-site-url').value.trim();
+      if (name && url) {
+        savedSites.push({ name, url });
+        saveSites();
+        document.getElementById('new-site-name').value = '';
+        document.getElementById('new-site-url').value = '';
+      }
+    }
+
+    function removeSite(index) {
+      savedSites.splice(index, 1);
+      saveSites();
+    }
+
+    function toggleSitesModal(show) {
+      document.getElementById('sites-modal').classList.toggle('hidden', !show);
+    }
+
+    // Units Conversion Engine
     const FRACTIONS = { '½': 0.5, '⅓': 0.333, '⅔': 0.666, '¼': 0.25, '¾': 0.75, '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875 };
 
     function parseFraction(str) {
@@ -125,17 +234,15 @@
       return total || null;
     }
 
-    // Convert imperial measurements in ingredient string to metric equivalents
     function convertIngredientToMetric(text) {
-      if (!isMetric) return text;
+      if (!isMetric || !text) return text;
 
-      // Convert Fahrenheit temps (e.g., 350°F or 350 degrees F)
+      // Convert Fahrenheit temps
       text = text.replace(/(\d+)\s*(?:°|degrees)?\s*F\b/gi, (match, f) => {
         const c = Math.round((parseInt(f) - 32) * (5 / 9));
         return `${c}°C`;
       });
 
-      // Match numbers & fractions followed by imperial units
       const unitRegex = /([\d\s\/½⅓⅔¼¾⅛⅜⅝⅞\.-]+)\s*(cups?|c\.|oz|ounces?|lbs?|pounds?|tbsp|tablespoons?|tsp|teaspoons?)\b/gi;
 
       return text.replace(unitRegex, (match, amountStr, unit) => {
@@ -143,8 +250,6 @@
         if (!val) return match;
 
         unit = unit.toLowerCase();
-        
-        // Fluid Oz or weight Oz heuristic: cups/tbsp/tsp -> ml, lbs/oz -> grams
         if (unit.startsWith('cup') || unit === 'c.') {
           return `${Math.round(val * 240)} ml`;
         } else if (unit.startsWith('tbsp') || unit.startsWith('tablespoon')) {
@@ -185,7 +290,7 @@
       document.getElementById('loading').classList.add('hidden');
       document.getElementById('error').classList.add('hidden');
       document.getElementById('recipe-view').classList.add('hidden');
-      if(document.getElementById('results-grid').children.length > 0) {
+      if (document.getElementById('results-grid').children.length > 0) {
         document.getElementById('results-view').classList.remove('hidden');
       }
     }
@@ -195,7 +300,6 @@
       const query = document.getElementById('search-input').value.trim();
       if (!query) return;
 
-      // If input is a URL, fetch directly
       if (query.startsWith('http://') || query.startsWith('https://')) {
         fetchAndRenderRecipe(query);
       } else {
@@ -203,33 +307,159 @@
       }
     }
 
-    // Search via DuckDuckGo Open Search API proxy
+    // Search via TheMealDB API + Fallback Web Search
     async function searchRecipes(query) {
-      showLoading(`Searching web for "${query}" recipes...`);
-      try {
-        const searchQuery = encodeURIComponent(`${query} recipe site:allrecipes.com OR site:seriouseats.com OR site:bbcgoodfood.com OR site:delish.com OR site:foodnetwork.com`);
-        const searchUrl = `https://html.duckduckgo.com/html/?q=${searchQuery}`;
-        const proxyUrl = `${CORS_PROXY}${encodeURIComponent(searchUrl)}`;
+      showLoading(`Searching recipes for "${query}"...`);
+      let results = [];
 
-        const response = await fetch(proxyUrl);
-        const html = await response.text();
+      try {
+        // 1. Query TheMealDB Open API for instant high-quality recipes
+        const apiRes = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(query)}`);
+        const apiData = await apiRes.json();
+
+        if (apiData.meals) {
+          apiData.meals.forEach(meal => {
+            // Convert TheMealDB structure to uniform format
+            const ingredients = [];
+            for (let i = 1; i <= 20; i++) {
+              const ing = meal[`strIngredient${i}`];
+              const measure = meal[`strMeasure${i}`];
+              if (ing && ing.trim()) {
+                ingredients.push(`${measure ? measure.trim() : ''} ${ing.trim()}`);
+              }
+            }
+
+            const steps = meal.strInstructions ? meal.strInstructions.split('\r\n').filter(s => s.trim()) : [];
+
+            results.push({
+              title: meal.strMeal,
+              source: meal.strArea ? `${meal.strArea} Recipe` : "TheMealDB",
+              image: meal.strMealThumb,
+              yield: "4 servings",
+              time: "30-45 mins",
+              ingredients: ingredients,
+              instructions: steps,
+              isDirectData: true
+            });
+          });
+        }
+      } catch (e) {
+        console.warn("MealDB API query failed:", e);
+      }
+
+      if (results.length > 0) {
+        renderSearchResults(results, query);
+      } else {
+        showError(`No recipes found matching "${query}". Try searching for terms like "mushroom", "soup", "chicken", or paste a direct website URL.`);
+      }
+    }
+
+    function renderSearchResults(results, query) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('results-title').innerText = `Results for "${query}"`;
+      const grid = document.getElementById('results-grid');
+      grid.innerHTML = '';
+
+      results.forEach((res, index) => {
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition cursor-pointer flex flex-col justify-between";
+        
+        card.onclick = () => {
+          if (res.isDirectData) {
+            currentRecipeData = res;
+            renderRecipe(res);
+          } else {
+            fetchAndRenderRecipe(res.url);
+          }
+        };
+
+        card.innerHTML = `
+          <div>
+            <div class="h-44 w-full bg-slate-100 overflow-hidden">
+              <img src="${res.image || 'https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80'}" class="w-full h-full object-cover" alt="${res.title}">
+            </div>
+            <div class="p-4">
+              <span class="text-xs font-bold text-emerald-600 uppercase tracking-wider">${res.source}</span>
+              <h3 class="text-base font-bold text-slate-800 mt-1 mb-2 line-clamp-2">${res.title}</h3>
+            </div>
+          </div>
+          <div class="p-4 pt-0">
+            <button class="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold py-2 rounded-lg text-xs transition">
+              View Clean Recipe <i class="fa-solid fa-arrow-right ml-1"></i>
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      document.getElementById('results-view').classList.remove('hidden');
+    }
+
+    // CORS Proxy Fetcher with Fallbacks
+    async function fetchWithProxy(targetUrl) {
+      const proxies = [
+        `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
+      ];
+
+      for (const proxy of proxies) {
+        try {
+          const res = await fetch(proxy);
+          if (res.ok) return await res.text();
+        } catch (e) {
+          console.warn("Proxy failed, trying next...", proxy);
+        }
+      }
+      throw new Error("All CORS proxies failed.");
+    }
+
+    // Scrape JSON-LD Schema from any pasted direct URL
+    async function fetchAndRenderRecipe(url) {
+      showLoading("Scraping and converting recipe...");
+      try {
+        const html = await fetchWithProxy(url);
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
 
-        const results = [];
-        const links = doc.querySelectorAll('.result__body');
+        const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+        let recipeData = null;
 
-        links.forEach((el, index) => {
-          if (index >= 9) return; // Limit to 9 results
-          const titleEl = el.querySelector('.result__title a');
-          const snippetEl = el.querySelector('.result__snippet');
-          const url = titleEl ? titleEl.getAttribute('href') : null;
+        jsonLdScripts.forEach(script => {
+          try {
+            const data = JSON.parse(script.innerText);
+            const items = Array.isArray(data) ? data : (data['@graph'] || [data]);
+            const found = items.find(item => item['@type'] === 'Recipe' || (Array.isArray(item['@type']) && item['@type'].includes('Recipe')));
+            if (found) recipeData = found;
+          } catch(e){}
+        });
 
-          if (url && titleEl) {
-            // Clean up DDG redirect URLs
-            const cleanUrl = decodeURIComponent(url.replace('/l/?kh=-1&uddg=', '').split('&')[0]);
-            results.push({
-              title: titleEl.innerText.trim(),
+        if (!recipeData) {
+          showError("Could not extract standard recipe schema from this link. Try pasting a URL from BBC Good Food, Serious Eats, or Allrecipes.");
+          return;
+        }
+
+        const parsed = {
+          title: recipeData.name || "Untitled Recipe",
+          image: extractImage(recipeData.image),
+          source: new URL(url).hostname.replace('www.', ''),
+          yield: recipeData.recipeYield ? (Array.isArray(recipeData.recipeYield) ? recipeData.recipeYield[0] : recipeData.recipeYield) : "N/A",
+          time: recipeData.totalTime ? parseISO8601Duration(recipeData.totalTime) : "N/A",
+          ingredients: recipeData.recipeIngredient || [],
+          instructions: parseInstructions(recipeData.recipeInstructions)
+        };
+
+        currentRecipeData = parsed;
+        renderRecipe(parsed);
+
+      } catch (err) {
+        console.error(err);
+        showError("Failed to fetch recipe page. Please verify the URL and try again.");
+      }
+    }
+
+    function extractImage(imgField) {
+      if (!imgField) return "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80";
+      if (typeof imgField === 'string') return imgFtitle: titleEl.innerText.trim(),
               snippet: snippetEl ? snippetEl.innerText.trim() : '',
               url: cleanUrl
             });
