@@ -8,7 +8,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     .checkbox-custom:checked + label { text-decoration: line-through; opacity: 0.6; }
-    /* Smooth height transitions for expanding cards */
     .recipe-expand-content {
       display: grid;
       grid-template-rows: 0fr;
@@ -37,7 +36,7 @@
         <input 
           type="text" 
           id="search-input" 
-          placeholder="Search or paste direct URL..." 
+          placeholder="Search all sites or paste URL..." 
           class="w-full px-4 py-2 rounded-l-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-300 text-sm"
           required
         />
@@ -65,10 +64,10 @@
     <section id="sites-manager" class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
       <div class="flex justify-between items-center mb-3">
         <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-          <i class="fa-solid fa-globe text-emerald-600"></i> Saved Recipe Websites
+          <i class="fa-solid fa-globe text-emerald-600"></i> Saved Recipe Websites & Indexes
         </h2>
         <button onclick="toggleSitesModal(true)" class="text-xs bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1">
-          <i class="fa-solid fa-gear"></i> Manage Sites
+          <i class="fa-solid fa-gear"></i> Manage & Index Sites
         </button>
       </div>
       <div id="saved-sites-pills" class="flex flex-wrap gap-2 text-xs"></div>
@@ -88,36 +87,39 @@
 
     <!-- Notification Banner -->
     <div id="notification" class="fixed bottom-4 right-4 bg-emerald-800 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50">
-      Recipe saved to Library!
+      Notification
     </div>
 
     <!-- Results/Library Grid -->
     <section id="main-view">
       <h2 class="text-2xl font-bold mb-6 text-slate-700 hidden" id="view-title">Search Results</h2>
-      <!-- Cards inject here -->
       <div id="results-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min"></div>
     </section>
 
   </main>
 
-  <!-- Modal for Managing Websites -->
+  <!-- Modal for Managing & Indexing Websites -->
   <div id="sites-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] flex flex-col">
       <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-sliders text-emerald-600 mr-2"></i>Manage Websites</h3>
+        <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-sliders text-emerald-600 mr-2"></i>Manage & Index Websites</h3>
         <button onclick="toggleSitesModal(false)" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
       </div>
-      <form onsubmit="addCustomSite(event)" class="mb-6 bg-slate-50 p-3 rounded-lg border border-slate-200">
-        <p class="text-xs font-semibold text-slate-600 mb-2">Add New Website</p>
+      
+      <form onsubmit="addCustomSite(event)" class="mb-6 bg-slate-50 p-3 rounded-lg border border-slate-200 shrink-0">
+        <p class="text-xs font-semibold text-slate-600 mb-2">Add New Website & Feed/Sitemap</p>
         <div class="space-y-2">
-          <input type="text" id="new-site-name" placeholder="Website Name" class="w-full px-3 py-1.5 border rounded text-xs focus:ring-2 focus:ring-emerald-500 outline-none" required />
-          <input type="url" id="new-site-url" placeholder="URL" class="w-full px-3 py-1.5 border rounded text-xs focus:ring-2 focus:ring-emerald-500 outline-none" required />
+          <input type="text" id="new-site-name" placeholder="Website Name (e.g. Serious Eats)" class="w-full px-3 py-1.5 border rounded text-xs focus:ring-2 focus:ring-emerald-500 outline-none" required />
+          <input type="url" id="new-site-url" placeholder="Main URL (https://www.seriouseats.com)" class="w-full px-3 py-1.5 border rounded text-xs focus:ring-2 focus:ring-emerald-500 outline-none" required />
+          <input type="url" id="new-site-feed" placeholder="RSS or Recipe Index URL (optional)" class="w-full px-3 py-1.5 border rounded text-xs focus:ring-2 focus:ring-emerald-500 outline-none" />
           <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-1.5 rounded text-xs transition">Add Website</button>
         </div>
       </form>
-      <h4 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">Saved Websites</h4>
-      <ul id="modal-sites-list" class="space-y-2 max-h-48 overflow-y-auto pr-1"></ul>
-      <div class="mt-6 text-right">
+
+      <h4 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">Saved Websites & Indexes</h4>
+      <ul id="modal-sites-list" class="space-y-2 overflow-y-auto pr-1 flex-grow"></ul>
+      
+      <div class="mt-6 text-right shrink-0">
         <button onclick="toggleSitesModal(false)" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold px-4 py-2 rounded-lg">Done</button>
       </div>
     </div>
@@ -129,11 +131,11 @@
     let myLibrary = JSON.parse(localStorage.getItem('clean_recipe_library')) || [];
     let currentRenderedCards = []; 
 
-    // --- Saved Sites Logic ---
+    // --- Saved Sites & Indexing Logic ---
     const DEFAULT_SITES = [
-      { name: "BBC Good Food", url: "https://www.bbcgoodfood.com" },
-      { name: "Serious Eats", url: "https://www.seriouseats.com" },
-      { name: "Allrecipes", url: "https://www.allrecipes.com" }
+      { name: "BBC Good Food", url: "https://www.bbcgoodfood.com", feed: "https://www.bbcgoodfood.com/rss", recipes: [] },
+      { name: "Serious Eats", url: "https://www.seriouseats.com", feed: "https://www.seriouseats.com/rss", recipes: [] },
+      { name: "Allrecipes", url: "https://www.allrecipes.com", feed: "https://www.allrecipes.com/rss", recipes: [] }
     ];
     let savedSites = JSON.parse(localStorage.getItem('clean_recipe_saved_sites')) || DEFAULT_SITES;
 
@@ -147,10 +149,11 @@
       const container = document.getElementById('saved-sites-pills');
       container.innerHTML = '';
       savedSites.forEach(site => {
+        const count = site.recipes ? site.recipes.length : 0;
         const btn = document.createElement('a');
         btn.href = site.url; btn.target = "_blank";
         btn.className = "bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 border border-slate-200 px-3 py-1 rounded-full transition flex items-center gap-1.5";
-        btn.innerHTML = `<i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> ${site.name}`;
+        btn.innerHTML = `<i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> ${site.name} <span class="bg-emerald-100 text-emerald-800 text-[9px] px-1.5 rounded-full font-bold">${count} indexed</span>`;
         container.appendChild(btn);
       });
     }
@@ -159,10 +162,20 @@
       const list = document.getElementById('modal-sites-list');
       list.innerHTML = '';
       savedSites.forEach((site, index) => {
+        const count = site.recipes ? site.recipes.length : 0;
         list.innerHTML += `
-          <li class="flex justify-between items-center bg-slate-50 p-2 rounded text-xs border border-slate-200">
-            <div><span class="font-bold text-slate-800">${site.name}</span><span class="text-slate-400 block text-[10px]">${site.url}</span></div>
-            <button onclick="removeSite(${index})" class="text-red-500 hover:text-red-700 p-1"><i class="fa-solid fa-trash"></i></button>
+          <li class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 p-2.5 rounded text-xs border border-slate-200 gap-2">
+            <div>
+              <span class="font-bold text-slate-800">${site.name}</span>
+              <span class="text-slate-400 block text-[10px]">${site.url}</span>
+              <span class="text-emerald-600 font-medium text-[10px]">${count} recipes indexed</span>
+            </div>
+            <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+              <button onclick="indexWebsite(${index})" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded font-medium transition flex items-center gap-1">
+                <i class="fa-solid fa-rotate"></i> Index
+              </button>
+              <button onclick="removeSite(${index})" class="bg-red-100 hover:bg-red-200 text-red-700 p-1.5 rounded transition"><i class="fa-solid fa-trash"></i></button>
+            </div>
           </li>`;
       });
     }
@@ -171,11 +184,65 @@
       e.preventDefault();
       const name = document.getElementById('new-site-name').value.trim();
       const url = document.getElementById('new-site-url').value.trim();
-      if (name && url) { savedSites.push({ name, url }); saveSites(); e.target.reset(); }
+      const feed = document.getElementById('new-site-feed').value.trim();
+      if (name && url) { 
+        savedSites.push({ name, url, feed, recipes: [] }); 
+        saveSites(); 
+        e.target.reset(); 
+      }
     }
 
     function removeSite(index) { savedSites.splice(index, 1); saveSites(); }
     function toggleSitesModal(show) { document.getElementById('sites-modal').classList.toggle('hidden', !show); }
+
+    // --- Website Indexing Engine ---
+    async function indexWebsite(index) {
+      const site = savedSites[index];
+      showNotification(`Indexing ${site.name}... Please wait.`);
+      
+      const targetUrl = site.feed || site.url;
+      try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+        const res = await fetch(proxyUrl);
+        if (!res.ok) throw new Error();
+        const text = await res.text();
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, 'text/html');
+        
+        let extractedRecipes = [];
+
+        // Check if XML/RSS Feed
+        const items = doc.querySelectorAll('item, entry');
+        if (items.length > 0) {
+          items.forEach(item => {
+            const title = item.querySelector('title')?.textContent;
+            const link = item.querySelector('link')?.textContent || item.querySelector('link')?.getAttribute('href');
+            if (title && link) {
+              extractedRecipes.push({ title: title.trim(), url: link.trim(), source: site.name });
+            }
+          });
+        } else {
+          // Fallback: Scrape regular recipe links from the HTML page
+          doc.querySelectorAll('a').forEach(a => {
+            const href = a.getAttribute('href');
+            const title = a.textContent?.trim();
+            if (href && title && title.length > 10 && (href.includes('recipe') || href.includes('food') || href.includes('dish'))) {
+              const fullUrl = href.startsWith('http') ? href : new URL(href, site.url).href;
+              if (!extractedRecipes.some(r => r.url === fullUrl)) {
+                extractedRecipes.push({ title, url: fullUrl, source: site.name });
+              }
+            }
+          });
+        }
+
+        site.recipes = extractedRecipes;
+        saveSites();
+        showNotification(`Successfully indexed ${extractedRecipes.length} recipes for ${site.name}!`);
+      } catch (e) {
+        showNotification(`Failed to index ${site.name}. Try adding a direct RSS feed URL.`);
+      }
+    }
 
     // --- Metric Conversion Engine ---
     const FRACTIONS = { '½': 0.5, '⅓': 0.333, '⅔': 0.666, '¼': 0.25, '¾': 0.75, '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875 };
@@ -209,8 +276,6 @@
     function toggleUnits() {
       isMetric = !isMetric;
       document.getElementById('global-unit-toggle').innerText = isMetric ? "Units: Metric" : "Units: Original";
-      
-      // Update currently open recipes
       currentRenderedCards.forEach((res, index) => {
         const expandedContent = document.getElementById(`expand-content-${index}`);
         if (expandedContent && expandedContent.classList.contains('open')) {
@@ -246,12 +311,12 @@
         const notif = document.getElementById('notification');
         notif.innerText = msg;
         notif.classList.remove('translate-y-20', 'opacity-0');
-        setTimeout(() => notif.classList.add('translate-y-20', 'opacity-0'), 3000);
+        setTimeout(() => notif.classList.add('translate-y-20', 'opacity-0'), 4000);
     }
 
     async function handleSearch(e) {
       e.preventDefault();
-      const query = document.getElementById('search-input').value.trim();
+      const query = document.getElementById('search-input').value.trim().toLowerCase();
       if (!query) return;
 
       document.getElementById('sites-manager').classList.remove('hidden');
@@ -266,18 +331,40 @@
         return;
       }
 
-      showLoading(`Searching recipes for "${query}"...`);
+      showLoading(`Searching recipes for "${query}" across all sources...`);
       let results = [];
+
+      // 1. Search across user's indexed saved sites
+      savedSites.forEach(site => {
+        if (site.recipes) {
+          site.recipes.forEach(rec => {
+            if (rec.title.toLowerCase().includes(query)) {
+              results.push({
+                id: btoa(rec.url).substring(0, 10),
+                title: rec.title,
+                source: site.name,
+                url: rec.url,
+                image: "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80",
+                yield: "N/A", time: "N/A",
+                ingredients: ["Click 'Open' to load ingredients from URL."],
+                instructions: ["Click 'Open' to load instructions from URL."]
+              });
+            }
+          });
+        }
+      });
+
+      // 2. Search TheMealDB API
       try {
         const apiRes = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(query)}`);
         const apiData = await apiRes.json();
         if (apiData.meals) {
-          results = apiData.meals.map(meal => {
+          apiData.meals.forEach(meal => {
             const ingredients = [];
             for (let i=1; i<=20; i++) {
               if (meal[`strIngredient${i}`]?.trim()) ingredients.push(`${meal[`strMeasure${i}`]?.trim() || ''} ${meal[`strIngredient${i}`].trim()}`);
             }
-            return {
+            results.push({
               id: meal.idMeal,
               title: meal.strMeal,
               source: meal.strArea ? `${meal.strArea} Recipe` : "TheMealDB",
@@ -286,14 +373,14 @@
               yield: "4 servings", time: "30-45 mins",
               ingredients,
               instructions: meal.strInstructions ? meal.strInstructions.split('\r\n').filter(s=>s.trim()) : [],
-            };
+            });
           });
         }
       } catch(e) {}
 
       document.getElementById('loading').classList.add('hidden');
       if (results.length > 0) renderResultsGrid(results, `Results for "${query}"`, false);
-      else showError(`No recipes found matching "${query}". Try another term or paste a URL.`);
+      else showError(`No recipes found matching "${query}". Try indexing more sites or pasting a direct URL.`);
     }
 
     async function fetchRecipeFromUrl(url) {
@@ -313,7 +400,19 @@
           } catch(e){}
         });
 
-        if (!recipeData) { showError("Could not extract standard schema from this link."); return null; }
+        if (!recipeData) { 
+          // Fallback if no JSON-LD schema
+          return {
+            id: btoa(url).substring(0, 10),
+            title: doc.querySelector('h1')?.innerText || "Untitled Recipe",
+            url: url,
+            image: doc.querySelector('img']?.src || "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80",
+            source: new URL(url).hostname.replace('www.', ''),
+            yield: "N/A", time: "N/A",
+            ingredients: ["Could not automatically parse structured ingredients. Visit original site."],
+            instructions: ["Visit original site for instructions."]
+          };
+        }
 
         let instructions = [];
         if (recipeData.recipeInstructions) {
@@ -376,7 +475,7 @@
             : `<button onclick="saveToLibrary(${index})" class="shrink-0 ${isSaved ? 'bg-slate-200 text-slate-500' : 'bg-slate-800 hover:bg-black text-white'} text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition" ${isSaved ? 'disabled' : ''}><i class="fa-solid fa-bookmark"></i> ${isSaved ? 'Saved' : 'Save'}</button>`;
 
         card.innerHTML = `
-          <div class="cursor-pointer group flex flex-col" onclick="toggleRecipeExpand(${index})">
+          <div class="cursor-pointer group flex flex-col" onclick="onCardClick(${index})">
             <div class="h-44 w-full bg-slate-100 overflow-hidden relative">
               <img src="${res.image}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" alt="${res.title}">
               <div class="absolute inset-0 bg-black/10 group-hover:bg-transparent transition duration-300"></div>
@@ -401,7 +500,7 @@
                     <h2 class="text-xl md:text-2xl font-extrabold text-slate-800">${res.title}</h2>
                     <p class="text-xs md:text-sm text-slate-600 mt-1">
                       Source: <a href="${res.url}" target="_blank" class="text-emerald-600 underline font-semibold">${res.source}</a> 
-                      | Yields: ${res.yield}
+                      | Yields: <span id="res-yield-${index}">${res.yield}</span>
                     </p>
                   </div>
                   ${actionButtonHtml}
@@ -429,6 +528,19 @@
       });
     }
 
+    async function onCardClick(index) {
+      const res = currentRenderedCards[index];
+      // If it's an indexed search result that hasn't been scraped yet, fetch it on the fly!
+      if (res.ingredients.length === 1 && res.ingredients[0].includes("Click 'Open'")) {
+        showNotification("Fetching full recipe details...");
+        const fullData = await fetchRecipeFromUrl(res.url);
+        if (fullData) {
+          currentRenderedCards[index] = { ...res, ...fullData };
+        }
+      }
+      toggleRecipeExpand(index);
+    }
+
     function toggleRecipeExpand(index) {
       const content = document.getElementById(`expand-content-${index}`);
       const icon = document.getElementById(`expand-icon-${index}`);
@@ -437,19 +549,17 @@
 
       if (content.classList.contains('open')) {
         content.classList.remove('open');
-        card.classList.remove('md:col-span-2', 'lg:col-span-3'); // Shrink card
+        card.classList.remove('md:col-span-2', 'lg:col-span-3');
         icon.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Open';
       } else {
-        // Expand the card
         content.classList.add('open');
-        card.classList.add('md:col-span-2', 'lg:col-span-3'); // Make it span full row
+        card.classList.add('md:col-span-2', 'lg:col-span-3');
         icon.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Close';
         
-        // Render ingredients and instructions on demand
+        document.getElementById(`res-yield-${index}`).innerText = res.yield;
         renderIngredientsList(index, res.ingredients);
         renderInstructionsList(index, res.instructions);
         
-        // Scroll to the card smoothly
         setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
       }
     }
@@ -486,7 +596,6 @@
             myLibrary.push(recipe);
             localStorage.setItem('clean_recipe_library', JSON.stringify(myLibrary));
             
-            // Update button UI
             const card = document.getElementById(`recipe-card-${index}`);
             const btn = card.querySelector('button[onclick^="saveToLibrary"]');
             btn.className = "shrink-0 bg-slate-200 text-slate-500 text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition";
@@ -501,7 +610,7 @@
         myLibrary = myLibrary.filter(r => r.id !== id);
         localStorage.setItem('clean_recipe_library', JSON.stringify(myLibrary));
         showNotification("Recipe removed.");
-        showLibrary(); // Re-render library view
+        showLibrary();
     }
 
     function showLibrary() {
