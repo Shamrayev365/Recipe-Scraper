@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CleanRecipe - Distraction-Free Recipe Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .checkbox-custom:checked + label { text-decoration: line-through; opacity: 0.6; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen font-sans pb-12">
+
+  <!-- Header -->
+  <header class="bg-emerald-600 text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-5xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="showSearch()">
+        <i class="fa-solid fa-utensils text-2xl text-emerald-200"></i>
+        <h1 class="text-2xl font-bold tracking-tight">CleanRecipe</h1>
+      </div>
+      
+      <!-- Search Bar -->
+      <form id="search-form" onsubmit="handleSearch(event)" class="w-full sm:w-96 flex">
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="Search recipes or paste URL..." 
+          class="w-full px-4 py-2 rounded-l-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+          required
+        />
+        <button type="submit" class="bg-emerald-800 hover:bg-emerald-900 px-5 py-2 rounded-r-lg font-medium transition">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </button>
+      </form>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-5xl mx-auto px-4 mt-8">
+    
+    <!-- Loading State -->
+    <div id="loading" class="hidden text-center py-20">
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-emerald-600 border-t-transparent mb-4"></div>
+      <p class="text-slate-600 font-medium text-lg" id="loading-text">Fetching recipe data...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error" class="hidden bg-red-50 border-l-4 border-red-500 p-4 rounded shadow-sm my-6">
+      <div class="flex items-center">
+        <i class="fa-solid fa-circle-exclamation text-red-500 text-xl mr-3"></i>
+        <p class="text-red-700 font-medium" id="error-message">Could not load recipe.</p>
+      </div>
+    </div>
+
+    <!-- Results Grid -->
+    <section id="results-view" class="hidden">
+      <h2 class="text-2xl font-bold mb-6 text-slate-700" id="results-title">Search Results</h2>
+      <div id="results-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+    </section>
+
+    <!-- Detailed Recipe View -->
+    <article id="recipe-view" class="hidden bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
+      <!-- Recipe Header -->
+      <div class="relative h-72 sm:h-96 w-full bg-slate-200">
+        <img id="recipe-img" class="w-full h-full object-cover" src="" alt="Recipe Image">
+        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex items-end">
+          <div class="p-6 text-white w-full">
+            <span id="recipe-source" class="bg-emerald-600 text-xs px-2.5 py-1 rounded-full uppercase tracking-wider font-semibold"></span>
+            <h1 id="recipe-title" class="text-3xl sm:text-4xl font-extrabold mt-2 mb-2 leading-tight"></h1>
+            <div class="flex flex-wrap items-center gap-4 text-sm text-slate-200 mt-2">
+              <span id="recipe-yield"><i class="fa-solid fa-users mr-1"></i> <span>-</span></span>
+              <span id="recipe-time"><i class="fa-solid fa-clock mr-1"></i> <span>-</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recipe Content -->
+      <div class="p-6 sm:p-10 grid grid-cols-1 md:grid-cols-3 gap-10">
+        
+        <!-- Ingredients Column -->
+        <div class="md:col-span-1 bg-slate-50 p-6 rounded-xl border border-slate-200 h-fit">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-basket-shopping mr-2 text-emerald-600"></i>Ingredients</h3>
+            <button onclick="toggleUnits()" id="unit-toggle" class="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2.5 py-1 rounded hover:bg-emerald-200">
+              Units: Metric
+            </button>
+          </div>
+          <ul id="ingredients-list" class="space-y-3"></ul>
+        </div>
+
+        <!-- Instructions Column -->
+        <div class="md:col-span-2">
+          <h3 class="text-2xl font-bold text-slate-800 mb-6"><i class="fa-solid fa-list-check mr-2 text-emerald-600"></i>Instructions</h3>
+          <ol id="instructions-list" class="space-y-6"></ol>
+        </div>
+      </div>
+    </article>
+
+  </main>
+
+  <script>
+    let isMetric = true;
+    let currentRecipeData = null;
+
+    const CORS_PROXY = "https://corsproxy.io/?";
+
+    // Common imperial unit conversion regex patterns
+    const FRACTIONS = { '½': 0.5, '⅓': 0.333, '⅔': 0.666, '¼': 0.25, '¾': 0.75, '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875 };
+
+    function parseFraction(str) {
+      let total = 0;
+      const parts = str.trim().split(' ');
+      parts.forEach(p => {
+        if (FRACTIONS[p]) {
+          total += FRACTIONS[p];
+        } else if (p.includes('/')) {
+          const [num, den] = p.split('/');
+          total += parseFloat(num) / parseFloat(den);
+        } else if (!isNaN(parseFloat(p))) {
+          total += parseFloat(p);
+        }
+      });
+      return total || null;
+    }
+
+    // Convert imperial measurements in ingredient string to metric equivalents
+    function convertIngredientToMetric(text) {
+      if (!isMetric) return text;
+
+      // Convert Fahrenheit temps (e.g., 350°F or 350 degrees F)
+      text = text.replace(/(\d+)\s*(?:°|degrees)?\s*F\b/gi, (match, f) => {
+        const c = Math.round((parseInt(f) - 32) * (5 / 9));
+        return `${c}°C`;
+      });
+
+      // Match numbers & fractions followed by imperial units
+      const unitRegex = /([\d\s\/½⅓⅔¼¾⅛⅜⅝⅞\.-]+)\s*(cups?|c\.|oz|ounces?|lbs?|pounds?|tbsp|tablespoons?|tsp|teaspoons?)\b/gi;
+
+      return text.replace(unitRegex, (match, amountStr, unit) => {
+        const val = parseFraction(amountStr);
+        if (!val) return match;
+
+        unit = unit.toLowerCase();
+        
+        // Fluid Oz or weight Oz heuristic: cups/tbsp/tsp -> ml, lbs/oz -> grams
+        if (unit.startsWith('cup') || unit === 'c.') {
+          return `${Math.round(val * 240)} ml`;
+        } else if (unit.startsWith('tbsp') || unit.startsWith('tablespoon')) {
+          return `${Math.round(val * 15)} ml`;
+        } else if (unit.startsWith('tsp') || unit.startsWith('teaspoon')) {
+          return `${Math.round(val * 5)} ml`;
+        } else if (unit.startsWith('lb') || unit.startsWith('pound')) {
+          return `${Math.round(val * 453.6)} g`;
+        } else if (unit.startsWith('oz') || unit.startsWith('ounce')) {
+          return `${Math.round(val * 28.35)} g`;
+        }
+
+        return match;
+      });
+    }
+
+    function toggleUnits() {
+      isMetric = !isMetric;
+      document.getElementById('unit-toggle').innerText = isMetric ? "Units: Metric" : "Units: Original";
+      if (currentRecipeData) renderIngredients(currentRecipeData.ingredients);
+    }
+
+    function showLoading(msg) {
+      document.getElementById('loading-text').innerText = msg;
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('error').classList.add('hidden');
+      document.getElementById('results-view').classList.add('hidden');
+      document.getElementById('recipe-view').classList.add('hidden');
+    }
+
+    function showError(msg) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('error-message').innerText = msg;
+      document.getElementById('error').classList.remove('hidden');
+    }
+
+    function showSearch() {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('error').classList.add('hidden');
+      document.getElementById('recipe-view').classList.add('hidden');
+      if(document.getElementById('results-grid').children.length > 0) {
+        document.getElementById('results-view').classList.remove('hidden');
+      }
+    }
+
+    async function handleSearch(e) {
+      e.preventDefault();
+      const query = document.getElementById('search-input').value.trim();
+      if (!query) return;
+
+      // If input is a URL, fetch directly
+      if (query.startsWith('http://') || query.startsWith('https://')) {
+        fetchAndRenderRecipe(query);
+      } else {
+        searchRecipes(query);
+      }
+    }
+
+    // Search via DuckDuckGo Open Search API proxy
+    async function searchRecipes(query) {
+      showLoading(`Searching web for "${query}" recipes...`);
+      try {
+        const searchQuery = encodeURIComponent(`${query} recipe site:allrecipes.com OR site:seriouseats.com OR site:bbcgoodfood.com OR site:delish.com OR site:foodnetwork.com`);
+        const searchUrl = `https://html.duckduckgo.com/html/?q=${searchQuery}`;
+        const proxyUrl = `${CORS_PROXY}${encodeURIComponent(searchUrl)}`;
+
+        const response = await fetch(proxyUrl);
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        const results = [];
+        const links = doc.querySelectorAll('.result__body');
+
+        links.forEach((el, index) => {
+          if (index >= 9) return; // Limit to 9 results
+          const titleEl = el.querySelector('.result__title a');
+          const snippetEl = el.querySelector('.result__snippet');
+          const url = titleEl ? titleEl.getAttribute('href') : null;
+
+          if (url && titleEl) {
+            // Clean up DDG redirect URLs
+            const cleanUrl = decodeURIComponent(url.replace('/l/?kh=-1&uddg=', '').split('&')[0]);
+            results.push({
+              title: titleEl.innerText.trim(),
+              snippet: snippetEl ? snippetEl.innerText.trim() : '',
+              url: cleanUrl
+            });
+          }
+        });
+
+        if (results.length === 0) {
+          showError('No recipes found. Try another search term or paste a direct recipe URL.');
+          return;
+        }
+
+        renderSearchResults(results, query);
+      } catch (err) {
+        console.error(err);
+        showError('Search failed. Please try pasting a direct recipe URL.');
+      }
+    }
+
+    function renderSearchResults(results, query) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('results-title').innerText = `Results for "${query}"`;
+      const grid = document.getElementById('results-grid');
+      grid.innerHTML = '';
+
+      results.forEach(res => {
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition cursor-pointer flex flex-col justify-between";
+        card.onclick = () => fetchAndRenderRecipe(res.url);
+
+        const domain = new URL(res.url).hostname.replace('www.', '');
+
+        card.innerHTML = `
+          <div>
+            <span class="text-xs font-bold text-emerald-600 uppercase tracking-wider">${domain}</span>
+            <h3 class="text-lg font-bold text-slate-800 mt-1 mb-2 line-clamp-2">${res.title}</h3>
+            <p class="text-sm text-slate-600 line-clamp-3 mb-4">${res.snippet}</p>
+          </div>
+          <button class="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold py-2 rounded-lg text-sm transition">
+            View Clean Recipe <i class="fa-solid fa-arrow-right ml-1"></i>
+          </button>
+        `;
+        grid.appendChild(card);
+      });
+
+      document.getElementById('results-view').classList.remove('hidden');
+    }
+
+    // Scrape JSON-LD Schema data from target recipe website
+    async function fetchAndRenderRecipe(url) {
+      showLoading("Scraping and converting recipe...");
+      try {
+        const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
+        const response = await fetch(proxyUrl);
+        const html = await response.text();
+        
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        // Extract JSON-LD scripts
+        const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+        let recipeData = null;
+
+        jsonLdScripts.forEach(script => {
+          try {
+            const data = JSON.parse(script.innerText);
+            
+            // Handle Schema @graph structures or arrays
+            const items = Array.isArray(data) ? data : (data['@graph'] || [data]);
+            const found = items.find(item => item['@type'] === 'Recipe' || (Array.isArray(item['@type']) && item['@type'].includes('Recipe')));
+            
+            if (found) recipeData = found;
+          } catch(e){}
+        });
+
+        if (!recipeData) {
+          showError("Could not extract standard JSON-LD recipe structure from this page. Try a site like Allrecipes, Serious Eats, or BBC Good Food.");
+          return;
+        }
+
+        // Parse extracted JSON-LD fields
+        const parsed = {
+          title: recipeData.name || "Untitled Recipe",
+          image: extractImage(recipeData.image),
+          source: new URL(url).hostname.replace('www.', ''),
+          yield: recipeData.recipeYield ? (Array.isArray(recipeData.recipeYield) ? recipeData.recipeYield[0] : recipeData.recipeYield) : "N/A",
+          time: recipeData.totalTime ? parseISO8601Duration(recipeData.totalTime) : "N/A",
+          ingredients: recipeData.recipeIngredient || [],
+          instructions: parseInstructions(recipeData.recipeInstructions)
+        };
+
+        currentRecipeData = parsed;
+        renderRecipe(parsed);
+
+      } catch (err) {
+        console.error(err);
+        showError("Failed to fetch page. Some sites block external requests.");
+      }
+    }
+
+    function extractImage(imgField) {
+      if (!imgField) return "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80";
+      if (typeof imgField === 'string') return imgField;
+      if (Array.isArray(imgField)) return imgField[0].url || imgField[0];
+      if (imgField.url) return imgField.url;
+      return "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80";
+    }
+
+    function parseISO8601Duration(duration) {
+      const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
+      if (!match) return duration;
+      const hours = match[1] ? `${match[1]}h ` : '';
+      const mins = match[2] ? `${match[2]}m` : '';
+      return hours + mins || duration;
+    }
+
+    function parseInstructions(instructions) {
+      if (!instructions) return [];
+      if (typeof instructions === 'string') return [instructions];
+      
+      let list = [];
+      instructions.forEach(step => {
+        if (typeof step === 'string') list.push(step);
+        else if (step['@type'] === 'HowToStep') list.push(step.text);
+        else if (step['@type'] === 'HowToSection' && step.itemListElement) {
+          step.itemListElement.forEach(s => list.push(s.text || s));
+        }
+      });
+      return list;
+    }
+
+    function renderRecipe(data) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('recipe-img').src = data.image;
+      document.getElementById('recipe-source').innerText = data.source;
+      document.getElementById('recipe-title').innerText = data.title;
+      document.getElementById('recipe-yield').querySelector('span').innerText = data.yield;
+      document.getElementById('recipe-time').querySelector('span').innerText = data.time;
+
+      renderIngredients(data.ingredients);
+
+      // Render Instructions
+      const instructionsOl = document.getElementById('instructions-list');
+      instructionsOl.innerHTML = '';
+      data.instructions.forEach((step, idx) => {
+        const li = document.createElement('li');
+        li.className = "flex items-start space-x-4";
+        li.innerHTML = `
+          <input type="checkbox" id="step-${idx}" class="checkbox-custom mt-1 h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+          <label for="step-${idx}" class="text-slate-700 leading-relaxed cursor-pointer select-none">${convertIngredientToMetric(step)}</label>
+        `;
+        instructionsOl.appendChild(li);
+      });
+
+      document.getElementById('recipe-view').classList.remove('hidden');
+    }
+
+    function renderIngredients(ingredients) {
+      const ingredientsUl = document.getElementById('ingredients-list');
+      ingredientsUl.innerHTML = '';
+      ingredients.forEach(ing => {
+        const converted = convertIngredientToMetric(ing);
+        const li = document.createElement('li');
+        li.className = "text-slate-700 text-sm flex items-start space-x-2";
+        li.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500 mt-1 text-xs"></i> <span>${converted}</span>`;
+        ingredientsUl.appendChild(li);
+      });
+    }
+  </script>
+</body>
+</html>
