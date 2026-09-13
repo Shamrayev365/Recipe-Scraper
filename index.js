@@ -3,7 +3,6 @@ export default {
     const url = new URL(request.url);
     const targetUrl = url.searchParams.get('url');
 
-    // Server-side proxy to bypass CORS and Cloudflare blocks
     if (targetUrl) {
       try {
         const res = await fetch(targetUrl, {
@@ -28,7 +27,6 @@ export default {
       }
     }
 
-    // Serve the HTML frontend
     return new Response(HTML_CONTENT, {
       headers: { 'Content-Type': 'text/html;charset=UTF-8' }
     });
@@ -88,30 +86,38 @@ const HTML_CONTENT = `<!DOCTYPE html>
       <div id="results-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min"></div>
     </section>
   </main>
+  
   <div id="sites-modal" class="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] flex flex-col">
       <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-bold text-slate-800">Manage Websites</h3>
+        <h3 class="text-lg font-bold text-slate-800">Manage & Index Websites</h3>
         <button onclick="toggleSitesModal(false)" class="text-xl">&times;</button>
       </div>
+      <form onsubmit="addCustomSite(event)" class="mb-4 bg-slate-50 p-3 rounded border">
+        <input type="text" id="new-site-name" placeholder="Website Name" class="w-full px-2 py-1 mb-2 border rounded text-xs" required />
+        <input type="url" id="new-site-url" placeholder="Main URL (https://example.com)" class="w-full px-2 py-1 mb-2 border rounded text-xs" required />
+        <button type="submit" class="w-full bg-emerald-600 text-white py-1 rounded text-xs font-semibold">Add Website</button>
+      </form>
       <ul id="modal-sites-list" class="space-y-2 overflow-y-auto pr-1 flex-grow mb-4"></ul>
       <button onclick="toggleSitesModal(false)" class="bg-slate-200 text-slate-700 text-xs font-semibold px-4 py-2 rounded-lg">Done</button>
     </div>
   </div>
+
   <script>
     let isMetric = true;
     let myLibrary = JSON.parse(localStorage.getItem('clean_recipe_library') || '[]');
     let currentRenderedCards = [];
-    let savedSites = [
-      { name: "BBC Good Food", url: "https://www.bbcgoodfood.com", recipes: [
-        { title: "Classic Victoria sponge cake", url: "https://www.bbcgoodfood.com/recipes/classic-victoria-sponge-cake", source: "BBC Good Food" },
-        { title: "Easy chicken curry", url: "https://www.bbcgoodfood.com/recipes/easy-chicken-curry", source: "BBC Good Food" },
-        { title: "Ultimate spaghetti carbonara", url: "https://www.bbcgoodfood.com/recipes/ultimate-spaghetti-carbonara", source: "BBC Good Food" }
-      ]},
-      { name: "Serious Eats", url: "https://www.seriouseats.com", recipes: [
-        { title: "The Best Chocolate Chip Cookies", url: "https://www.seriouseats.com/the-food-lab-best-chocolate-chip-cookie-recipe", source: "Serious Eats" }
-      ]}
-    ];
+    let savedSites = JSON.parse(localStorage.getItem('clean_recipe_saved_sites') || JSON.stringify([
+      { name: "BBC Good Food", url: "https://www.bbcgoodfood.com", recipes: [] },
+      { name: "Serious Eats", url: "https://www.seriouseats.com", recipes: [] },
+      { name: "Connoisseurus Veg", url: "https://www.connoisseurusveg.com", recipes: [] }
+    ]));
+
+    function saveSites() {
+      localStorage.setItem('clean_recipe_saved_sites', JSON.stringify(savedSites));
+      renderSitesPills();
+      renderModalSitesList();
+    }
 
     function renderSitesPills() {
       const container = document.getElementById('saved-sites-pills');
@@ -125,13 +131,60 @@ const HTML_CONTENT = `<!DOCTYPE html>
       const list = document.getElementById('modal-sites-list');
       list.innerHTML = '';
       savedSites.forEach((site, index) => {
-        list.innerHTML += \`<li class="flex justify-between items-center bg-slate-50 p-2.5 rounded text-xs border border-slate-200"><span>\${site.name} (\${site.recipes.length} recipes)</span><button onclick="indexWebsite(\${index})" class="bg-emerald-600 text-white px-2.5 py-1 rounded">Index</button></li>\`;
+        list.innerHTML += \`<li class="flex justify-between items-center bg-slate-50 p-2.5 rounded text-xs border border-slate-200">
+          <div><span class="font-bold">\${site.name}</span><br/><span class="text-emerald-600">\${site.recipes.length} recipes indexed</span></div>
+          <div class="flex gap-1">
+            <button type="button" onclick="indexWebsite(\${index})" class="bg-emerald-600 text-white px-2.5 py-1 rounded font-medium">Index</button>
+            <button type="button" onclick="removeSite(\${index})" class="bg-red-100 text-red-700 px-2 py-1 rounded"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </li>\`;
       });
     }
 
+    function addCustomSite(e) {
+      e.preventDefault();
+      const name = document.getElementById('new-site-name').value.trim();
+      const url = document.getElementById('new-site-url').value.trim();
+      if (name && url) {
+        savedSites.push({ name, url, recipes: [] });
+        saveSites();
+        e.target.reset();
+      }
+    }
+
+    function removeSite(index) {
+      savedSites.splice(index, 1);
+      saveSites();
+    }
+
+    function toggleSitesModal(show) {
+      document.getElementById('sites-modal').classList.toggle('hidden', !show);
+    }
+
     async function indexWebsite(index) {
-      showNotification(\`Indexed \${savedSites[index].name} successfully!\`);
-      renderSitesPills();
+      const site = savedSites[index];
+      showNotification(\`Indexing \href...\`);
+      try {
+        const res = await fetch(\`/?url=\${encodeURIComponent(site.url)}\`);
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        let extracted = [];
+        doc.querySelectorAll('a').forEach(a => {
+          const href = a.getAttribute('href');
+          const title = a.textContent?.trim();
+          if (href && title && title.length > 5) {
+            const fullUrl = href.startsWith('http') ? href : new URL(href, site.url).href;
+            if (!extracted.some(r => r.url === fullUrl)) {
+              extracted.push({ title, url: fullUrl, source: site.name });
+            }
+          }
+        });
+        site.recipes = extracted;
+        saveSites();
+        showNotification(\`Indexed \${extracted.length} recipes for \${site.name}!\`);
+      } catch(e) {
+        showNotification("Indexing failed.");
+      }
     }
 
     function showNotification(msg) {
@@ -152,48 +205,44 @@ const HTML_CONTENT = `<!DOCTYPE html>
       const query = document.getElementById('search-input').value.trim().toLowerCase();
       if (!query) return;
       document.getElementById('sites-manager').classList.add('hidden');
-      if (query.startsWith('http')) {
-        showLoading("Scraping URL via Cloudflare Worker...");
-        const res = await fetch(\`/?url=\${encodeURIComponent(query)}\`);
-        const html = await res.text();
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        renderResultsGrid([{
-          id: btoa(query),
-          title: doc.querySelector('h1')?.innerText || "Scraped Recipe",
-          source: new URL(query).hostname,
-          url: query,
-          image: doc.querySelector('img')?.src || "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80",
-          yield: "4 servings", time: "30 mins",
-          ingredients: ["Scraped successfully via Cloudflare Worker proxy."],
-          instructions: ["View original site for full instructions."]
-        }], "Scraped Recipe", false);
-        document.getElementById('loading').classList.add('hidden');
-        return;
-      }
+      
       let results = [];
-      savedSites.forEach(s => s.recipes.forEach(r => {
-        if(r.title.toLowerCase().includes(query)) results.push({...r, image: "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80", yield: "4 servings", time: "30 mins", ingredients: ["Sample ingredient 1", "Sample ingredient 2"], instructions: ["Step 1: Cook well."]});
-      }));
+      savedSites.forEach(s => {
+        s.recipes.forEach(r => {
+          if (r.title.toLowerCase().includes(query)) {
+            results.push({
+              id: btoa(r.url),
+              title: r.title,
+              source: s.name,
+              url: r.url,
+              image: "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80",
+              yield: "4 servings", time: "30 mins",
+              ingredients: ["Click 'Open Original Site' to load recipe ingredients."],
+              instructions: ["Click 'Open Original Site' to view cooking steps."]
+            });
+          }
+        });
+      });
+
       renderResultsGrid(results, \`Results for "\${query}"\`, false);
     }
 
-    function showLoading(msg) {
-      document.getElementById('loading-text').innerText = msg;
-      document.getElementById('loading').classList.remove('hidden');
-    }
-
-    function renderResultsGrid(results, titleStr, isLib) {
+    function renderResultsGrid(results, titleStr) {
       currentRenderedCards = results;
       const title = document.getElementById('view-title');
       title.innerText = titleStr; title.classList.remove('hidden');
       const grid = document.getElementById('results-grid');
       grid.innerHTML = '';
-      results.forEach((res, index) => {
+      if (results.length === 0) {
+        grid.innerHTML = '<p class="col-span-full text-slate-500 text-center py-10">No matching recipes found in your indexed sites.</p>';
+        return;
+      }
+      results.forEach((res) => {
         grid.innerHTML += \`<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
           <div class="h-44 w-full bg-slate-100 overflow-hidden"><img src="\${res.image}" class="w-full h-full object-cover"></div>
           <div class="p-4 flex-grow flex flex-col justify-between">
             <div><span class="text-[10px] font-bold text-emerald-600 uppercase">\${res.source}</span><h3 class="text-base font-bold text-slate-800 mt-1 mb-2">\${res.title}</h3></div>
-            <a href="\${res.url}" target="_blank" class="text-xs bg-emerald-600 text-white text-center py-2 rounded-lg font-semibold mt-2">Open Original Site</a>
+            <a href="\${res.url}" target="_blank" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white text-center py-2 rounded-lg font-semibold mt-2 transition">Open Original Site</a>
           </div>
         </div>\`;
       });
@@ -203,4 +252,4 @@ const HTML_CONTENT = `<!DOCTYPE html>
     renderModalSitesList();
   </script>
 </body>
-</html>`;
+</html>
