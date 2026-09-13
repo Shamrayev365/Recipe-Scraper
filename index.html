@@ -86,10 +86,15 @@
       </div>
     </div>
 
+    <!-- Notification Banner -->
+    <div id="notification" class="fixed bottom-4 right-4 bg-emerald-800 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+      Recipe saved to Library!
+    </div>
+
     <!-- Results/Library Grid -->
     <section id="main-view">
       <h2 class="text-2xl font-bold mb-6 text-slate-700 hidden" id="view-title">Search Results</h2>
-      <!-- Cards will inject here. Grid setup handles dynamic span expansion. -->
+      <!-- Cards inject here -->
       <div id="results-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min"></div>
     </section>
 
@@ -99,7 +104,7 @@
   <div id="sites-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
       <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-sliders text-emerald-600 mr-2"></i>Manage Saved Recipe Websites</h3>
+        <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-sliders text-emerald-600 mr-2"></i>Manage Websites</h3>
         <button onclick="toggleSitesModal(false)" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
       </div>
       <form onsubmit="addCustomSite(event)" class="mb-6 bg-slate-50 p-3 rounded-lg border border-slate-200">
@@ -122,7 +127,7 @@
     // --- Global State ---
     let isMetric = true;
     let myLibrary = JSON.parse(localStorage.getItem('clean_recipe_library')) || [];
-    let currentRenderedCards = []; // Keeps track of active DOM cards to update metric units globally
+    let currentRenderedCards = []; 
 
     // --- Saved Sites Logic ---
     const DEFAULT_SITES = [
@@ -204,11 +209,13 @@
     function toggleUnits() {
       isMetric = !isMetric;
       document.getElementById('global-unit-toggle').innerText = isMetric ? "Units: Metric" : "Units: Original";
-      // Re-render open recipes
-      currentRenderedCards.forEach(card => {
-        if (card.recipeData && card.isExpanded) {
-          renderIngredientsList(card.container, card.recipeData.ingredients);
-          renderInstructionsList(card.container, card.recipeData.instructions, card.recipeId);
+      
+      // Update currently open recipes
+      currentRenderedCards.forEach((res, index) => {
+        const expandedContent = document.getElementById(`expand-content-${index}`);
+        if (expandedContent && expandedContent.classList.contains('open')) {
+            renderIngredientsList(index, res.ingredients);
+            renderInstructionsList(index, res.instructions);
         }
       });
     }
@@ -221,6 +228,7 @@
       document.getElementById('results-grid').innerHTML = '';
       document.getElementById('view-title').classList.add('hidden');
     }
+    
     function showError(msg) {
       document.getElementById('loading').classList.add('hidden');
       document.getElementById('error-message').innerText = msg;
@@ -234,6 +242,13 @@
       document.getElementById('search-input').value = '';
     }
 
+    function showNotification(msg) {
+        const notif = document.getElementById('notification');
+        notif.innerText = msg;
+        notif.classList.remove('translate-y-20', 'opacity-0');
+        setTimeout(() => notif.classList.add('translate-y-20', 'opacity-0'), 3000);
+    }
+
     async function handleSearch(e) {
       e.preventDefault();
       const query = document.getElementById('search-input').value.trim();
@@ -241,18 +256,16 @@
 
       document.getElementById('sites-manager').classList.remove('hidden');
       
-      // If URL pasted
       if (query.startsWith('http')) {
         showLoading("Scraping direct URL...");
         const result = await fetchRecipeFromUrl(query);
         if (result) {
           document.getElementById('loading').classList.add('hidden');
-          renderResultsGrid([result], "Direct URL Scrape");
+          renderResultsGrid([result], "Direct URL Scrape", false);
         }
         return;
       }
 
-      // Keyword Search
       showLoading(`Searching recipes for "${query}"...`);
       let results = [];
       try {
@@ -273,14 +286,13 @@
               yield: "4 servings", time: "30-45 mins",
               ingredients,
               instructions: meal.strInstructions ? meal.strInstructions.split('\r\n').filter(s=>s.trim()) : [],
-              isDirectData: true
             };
           });
         }
       } catch(e) {}
 
       document.getElementById('loading').classList.add('hidden');
-      if (results.length > 0) renderResultsGrid(results, `Results for "${query}"`);
+      if (results.length > 0) renderResultsGrid(results, `Results for "${query}"`, false);
       else showError(`No recipes found matching "${query}". Try another term or paste a URL.`);
     }
 
@@ -322,7 +334,7 @@
         }
 
         return {
-          id: btoa(url).substring(0, 10), // fake id
+          id: btoa(url).substring(0, 10),
           title: recipeData.name || "Untitled",
           url: url,
           image: img,
@@ -330,8 +342,7 @@
           yield: recipeData.recipeYield ? (Array.isArray(recipeData.recipeYield) ? recipeData.recipeYield[0] : recipeData.recipeYield) : "N/A",
           time: recipeData.totalTime ? recipeData.totalTime.replace('PT','').toLowerCase() : "N/A",
           ingredients: recipeData.recipeIngredient || [],
-          instructions: instructions,
-          isDirectData: true
+          instructions: instructions
         };
       } catch (e) {
         showError("Failed to fetch page. Ensure the URL is correct and public.");
@@ -339,9 +350,9 @@
       }
     }
 
-    // --- Dynamic Grid Rendering & Unfolding ---
-    function renderResultsGrid(results, titleStr) {
-      currentRenderedCards = [];
+    // --- Render Grid & Expand Logic ---
+    function renderResultsGrid(results, titleStr, isLibraryView) {
+      currentRenderedCards = results;
       const title = document.getElementById('view-title');
       title.innerText = titleStr;
       title.classList.remove('hidden');
@@ -349,26 +360,31 @@
       const grid = document.getElementById('results-grid');
       grid.innerHTML = '';
 
-      results.forEach((res, index) => {
-        // Build Card Element
-        const card = document.createElement('div');
-        // Base state: normal card size. When active, it will get 'col-span-full'
-        card.className = "bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-300 ease-in-out self-start flex flex-col";
-        
-        const cardId = `recipe-card-${index}`;
-        card.id = cardId;
+      if (results.length === 0) {
+        grid.innerHTML = '<p class="col-span-full text-slate-500 text-center py-10">No recipes found here.</p>';
+        return;
+      }
 
-        // Header/Collapsed View
-        const headerHtml = `
+      results.forEach((res, index) => {
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-300 flex flex-col";
+        card.id = `recipe-card-${index}`;
+
+        const isSaved = myLibrary.some(r => r.id === res.id);
+        const actionButtonHtml = isLibraryView 
+            ? `<button onclick="removeFromLibrary('${res.id}')" class="shrink-0 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition"><i class="fa-solid fa-trash"></i> Remove</button>`
+            : `<button onclick="saveToLibrary(${index})" class="shrink-0 ${isSaved ? 'bg-slate-200 text-slate-500' : 'bg-slate-800 hover:bg-black text-white'} text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition" ${isSaved ? 'disabled' : ''}><i class="fa-solid fa-bookmark"></i> ${isSaved ? 'Saved' : 'Save'}</button>`;
+
+        card.innerHTML = `
           <div class="cursor-pointer group flex flex-col" onclick="toggleRecipeExpand(${index})">
             <div class="h-44 w-full bg-slate-100 overflow-hidden relative">
               <img src="${res.image}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" alt="${res.title}">
-              <div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition duration-300"></div>
+              <div class="absolute inset-0 bg-black/10 group-hover:bg-transparent transition duration-300"></div>
             </div>
             <div class="p-4 flex-grow flex flex-col justify-between">
               <div>
                 <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">${res.source}</span>
-                <h3 class="text-base font-bold text-slate-800 mt-1 mb-2 leading-tight">${res.title}</h3>
+                <h3 class="text-base font-bold text-slate-800 mt-1 mb-2 leading-tight line-clamp-2">${res.title}</h3>
               </div>
               <div class="text-xs text-slate-500 flex items-center justify-between mt-2">
                 <span><i class="fa-solid fa-clock"></i> ${res.time}</span>
@@ -377,53 +393,128 @@
             </div>
           </div>
           
-          <!-- Expanded Inline View (Hidden initially via grid rows trick) -->
           <div id="expand-content-${index}" class="recipe-expand-content border-t border-slate-100 bg-slate-50">
             <div class="recipe-expand-inner">
-              <div class="p-6">
-                <!-- Header inside expanded -->
-                <div class="flex justify-between items-start mb-6 pb-4 border-b border-slate-200">
+              <div class="p-4 md:p-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6 pb-4 border-b border-slate-200">
                   <div>
-                    <h2 class="text-2xl font-extrabold text-slate-800">${res.title}</h2>
-                    <p class="text-sm text-slate-600 mt-1">
+                    <h2 class="text-xl md:text-2xl font-extrabold text-slate-800">${res.title}</h2>
+                    <p class="text-xs md:text-sm text-slate-600 mt-1">
                       Source: <a href="${res.url}" target="_blank" class="text-emerald-600 underline font-semibold">${res.source}</a> 
                       | Yields: ${res.yield}
                     </p>
                   </div>
-                  <button onclick="saveToLibrary(${index})" class="shrink-0 bg-slate-800 hover:bg-black text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-sm">
-                    <i class="fa-solid fa-bookmark"></i> Save
-                  </button>
+                  ${actionButtonHtml}
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  <div class="md:col-span-1 bg-white p-5 rounded-lg border border-slate-200 shadow-sm h-fit">
-                    <h3 class="font-bold text-slate-800 mb-4 border-b pb-2"><i class="fa-solid fa-basket-shopping text-emerald-600 mr-2"></i>Ingredients</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div class="md:col-span-1 bg-white p-4 rounded-lg border border-slate-200 shadow-sm h-fit">
+                    <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-sm"><i class="fa-solid fa-basket-shopping text-emerald-600 mr-2"></i>Ingredients</h3>
                     <ul id="ing-list-${index}" class="space-y-2"></ul>
                   </div>
                   <div class="md:col-span-2">
-                    <h3 class="font-bold text-slate-800 mb-4 border-b pb-2"><i class="fa-solid fa-list-check text-emerald-600 mr-2"></i>Instructions</h3>
-                    <ol id="inst-list-${index}" class="space-y-4"></ol>
+                    <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-sm"><i class="fa-solid fa-list-check text-emerald-600 mr-2"></i>Instructions</h3>
+                    <ol id="inst-list-${index}" class="space-y-3"></ol>
                   </div>
                 </div>
                 
                 <div class="mt-6 text-center">
-                  <button onclick="toggleRecipeExpand(${index})" class="text-sm text-slate-500 hover:text-slate-800 font-semibold px-4 py-2 bg-slate-200 rounded-lg">Close Recipe</button>
+                  <button onclick="toggleRecipeExpand(${index})" class="text-sm text-slate-500 hover:text-slate-800 font-semibold px-4 py-2 bg-slate-200 rounded-lg transition">Close Recipe</button>
                 </div>
               </div>
             </div>
           </div>
         `;
-
-        card.innerHTML = headerHtml;
         grid.appendChild(card);
+      });
+    }
 
-        Secure the current working state in Git before making structural UI changes.
+    function toggleRecipeExpand(index) {
+      const content = document.getElementById(`expand-content-${index}`);
+      const icon = document.getElementById(`expand-icon-${index}`);
+      const card = document.getElementById(`recipe-card-${index}`);
+      const res = currentRenderedCards[index];
 
-**Preserving the Current Version**
-Run these commands in your terminal to commit the current layout and spin up a new branch for the inline accordion feature:
+      if (content.classList.contains('open')) {
+        content.classList.remove('open');
+        card.classList.remove('md:col-span-2', 'lg:col-span-3'); // Shrink card
+        icon.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Open';
+      } else {
+        // Expand the card
+        content.classList.add('open');
+        card.classList.add('md:col-span-2', 'lg:col-span-3'); // Make it span full row
+        icon.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Close';
+        
+        // Render ingredients and instructions on demand
+        renderIngredientsList(index, res.ingredients);
+        renderInstructionsList(index, res.instructions);
+        
+        // Scroll to the card smoothly
+        setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+      }
+    }
 
-```bash
-git add .
-git commit -m "Save working version - recipes displaying at bottom"
-git branch working-but-imperfect
-git checkout -b feature-inline-dropdowns
+    function renderIngredientsList(index, ingredients) {
+      const ul = document.getElementById(`ing-list-${index}`);
+      ul.innerHTML = '';
+      ingredients.forEach(ing => {
+        const li = document.createElement('li');
+        li.className = "text-slate-700 text-xs flex items-start space-x-2";
+        li.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500 mt-0.5 text-[10px]"></i> <span>${convertIngredientToMetric(ing)}</span>`;
+        ul.appendChild(li);
+      });
+    }
+
+    function renderInstructionsList(index, instructions) {
+      const ol = document.getElementById(`inst-list-${index}`);
+      ol.innerHTML = '';
+      instructions.forEach((step, idx) => {
+        const li = document.createElement('li');
+        li.className = "flex items-start space-x-3";
+        li.innerHTML = `
+          <input type="checkbox" id="step-${index}-${idx}" class="checkbox-custom mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0">
+          <label for="step-${index}-${idx}" class="text-slate-700 text-sm leading-relaxed cursor-pointer select-none">${convertIngredientToMetric(step)}</label>
+        `;
+        ol.appendChild(li);
+      });
+    }
+
+    // --- Library Management ---
+    function saveToLibrary(index) {
+        const recipe = currentRenderedCards[index];
+        if (!myLibrary.some(r => r.id === recipe.id)) {
+            myLibrary.push(recipe);
+            localStorage.setItem('clean_recipe_library', JSON.stringify(myLibrary));
+            
+            // Update button UI
+            const card = document.getElementById(`recipe-card-${index}`);
+            const btn = card.querySelector('button[onclick^="saveToLibrary"]');
+            btn.className = "shrink-0 bg-slate-200 text-slate-500 text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition";
+            btn.innerHTML = '<i class="fa-solid fa-bookmark"></i> Saved';
+            btn.disabled = true;
+
+            showNotification("Recipe saved to your Library!");
+        }
+    }
+
+    function removeFromLibrary(id) {
+        myLibrary = myLibrary.filter(r => r.id !== id);
+        localStorage.setItem('clean_recipe_library', JSON.stringify(myLibrary));
+        showNotification("Recipe removed.");
+        showLibrary(); // Re-render library view
+    }
+
+    function showLibrary() {
+        document.getElementById('sites-manager').classList.add('hidden');
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('error').classList.add('hidden');
+        document.getElementById('search-input').value = '';
+        renderResultsGrid(myLibrary, "My Recipe Library", true);
+    }
+
+    // Initialize
+    renderSitesPills();
+    renderModalSitesList();
+  </script>
+</body>
+</html>
