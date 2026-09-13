@@ -350,7 +350,7 @@
       if (results.length > 0) {
         renderSearchResults(results, query);
       } else {
-        showError(`No recipes found matching "${query}". Try searching for terms like "mushroom", "soup", "chicken", or paste a direct website URL.`);
+        showError(`No recipes found matching "${query}". Try searching for another term or paste a direct website URL.`);
       }
     }
 
@@ -459,108 +459,6 @@
 
     function extractImage(imgField) {
       if (!imgField) return "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80";
-      if (typeof imgField === 'string') return imgFtitle: titleEl.innerText.trim(),
-              snippet: snippetEl ? snippetEl.innerText.trim() : '',
-              url: cleanUrl
-            });
-          }
-        });
-
-        if (results.length === 0) {
-          showError('No recipes found. Try another search term or paste a direct recipe URL.');
-          return;
-        }
-
-        renderSearchResults(results, query);
-      } catch (err) {
-        console.error(err);
-        showError('Search failed. Please try pasting a direct recipe URL.');
-      }
-    }
-
-    function renderSearchResults(results, query) {
-      document.getElementById('loading').classList.add('hidden');
-      document.getElementById('results-title').innerText = `Results for "${query}"`;
-      const grid = document.getElementById('results-grid');
-      grid.innerHTML = '';
-
-      results.forEach(res => {
-        const card = document.createElement('div');
-        card.className = "bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition cursor-pointer flex flex-col justify-between";
-        card.onclick = () => fetchAndRenderRecipe(res.url);
-
-        const domain = new URL(res.url).hostname.replace('www.', '');
-
-        card.innerHTML = `
-          <div>
-            <span class="text-xs font-bold text-emerald-600 uppercase tracking-wider">${domain}</span>
-            <h3 class="text-lg font-bold text-slate-800 mt-1 mb-2 line-clamp-2">${res.title}</h3>
-            <p class="text-sm text-slate-600 line-clamp-3 mb-4">${res.snippet}</p>
-          </div>
-          <button class="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold py-2 rounded-lg text-sm transition">
-            View Clean Recipe <i class="fa-solid fa-arrow-right ml-1"></i>
-          </button>
-        `;
-        grid.appendChild(card);
-      });
-
-      document.getElementById('results-view').classList.remove('hidden');
-    }
-
-    // Scrape JSON-LD Schema data from target recipe website
-    async function fetchAndRenderRecipe(url) {
-      showLoading("Scraping and converting recipe...");
-      try {
-        const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
-        const response = await fetch(proxyUrl);
-        const html = await response.text();
-        
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-
-        // Extract JSON-LD scripts
-        const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
-        let recipeData = null;
-
-        jsonLdScripts.forEach(script => {
-          try {
-            const data = JSON.parse(script.innerText);
-            
-            // Handle Schema @graph structures or arrays
-            const items = Array.isArray(data) ? data : (data['@graph'] || [data]);
-            const found = items.find(item => item['@type'] === 'Recipe' || (Array.isArray(item['@type']) && item['@type'].includes('Recipe')));
-            
-            if (found) recipeData = found;
-          } catch(e){}
-        });
-
-        if (!recipeData) {
-          showError("Could not extract standard JSON-LD recipe structure from this page. Try a site like Allrecipes, Serious Eats, or BBC Good Food.");
-          return;
-        }
-
-        // Parse extracted JSON-LD fields
-        const parsed = {
-          title: recipeData.name || "Untitled Recipe",
-          image: extractImage(recipeData.image),
-          source: new URL(url).hostname.replace('www.', ''),
-          yield: recipeData.recipeYield ? (Array.isArray(recipeData.recipeYield) ? recipeData.recipeYield[0] : recipeData.recipeYield) : "N/A",
-          time: recipeData.totalTime ? parseISO8601Duration(recipeData.totalTime) : "N/A",
-          ingredients: recipeData.recipeIngredient || [],
-          instructions: parseInstructions(recipeData.recipeInstructions)
-        };
-
-        currentRecipeData = parsed;
-        renderRecipe(parsed);
-
-      } catch (err) {
-        console.error(err);
-        showError("Failed to fetch page. Some sites block external requests.");
-      }
-    }
-
-    function extractImage(imgField) {
-      if (!imgField) return "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80";
       if (typeof imgField === 'string') return imgField;
       if (Array.isArray(imgField)) return imgField[0].url || imgField[0];
       if (imgField.url) return imgField.url;
@@ -600,7 +498,6 @@
 
       renderIngredients(data.ingredients);
 
-      // Render Instructions
       const instructionsOl = document.getElementById('instructions-list');
       instructionsOl.innerHTML = '';
       data.instructions.forEach((step, idx) => {
@@ -627,6 +524,10 @@
         ingredientsUl.appendChild(li);
       });
     }
+
+    // Initialize
+    renderSitesPills();
+    renderModalSitesList();
   </script>
 </body>
 </html>
