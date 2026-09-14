@@ -80,8 +80,8 @@ const HTML_CONTENT = `<!DOCTYPE html>
       </div>
       <form onsubmit="addCustomSite(event)" class="mb-4 bg-slate-50 p-3 rounded border">
         <input type="text" id="new-site-name" placeholder="Site Name (e.g. Connoisseurus Veg)" class="w-full px-2 py-1 mb-2 border rounded text-xs" required />
-        <input type="url" id="new-site-url" placeholder="RSS Feed or Sitemap URL (e.g. .../feed/)" class="w-full px-2 py-1 mb-2 border rounded text-xs" required />
-        <button type="submit" class="w-full bg-emerald-600 text-white py-1 rounded text-xs font-semibold">Add Feed / Sitemap</button>
+        <input type="url" id="new-site-feed" placeholder="RSS Feed URL (e.g. https://site.com/feed/)" class="w-full px-2 py-1 mb-2 border rounded text-xs" required />
+        <button type="submit" class="w-full bg-emerald-600 text-white py-1 rounded text-xs font-semibold">Add Feed</button>
       </form>
       <ul id="modal-sites-list" class="space-y-2 overflow-y-auto pr-1 flex-grow mb-4"></ul>
       <button onclick="toggleSitesModal(false)" class="bg-slate-200 text-slate-700 text-xs font-semibold px-4 py-2 rounded-lg">Done</button>
@@ -90,7 +90,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
 
   <script>
     let savedSites = JSON.parse(localStorage.getItem('clean_recipe_saved_sites') || JSON.stringify([
-      { name: "Connoisseurus Veg", url: "https://connoisseurusveg.com/feed/", recipes: [] }
+      { name: "Connoisseur Veg", feedUrl: "https://connoisseurusveg.com/feed/", recipes: [] }
     ]));
 
     function saveSites() {
@@ -112,8 +112,8 @@ const HTML_CONTENT = `<!DOCTYPE html>
       list.innerHTML = '';
       savedSites.forEach((site, index) => {
         list.innerHTML += \`<li class="flex justify-between items-center bg-slate-50 p-2.5 rounded text-xs border border-slate-200">
-          <div class="truncate max-w-[240px]"><span class="font-bold">\${site.name}</span><br/><span class="text-emerald-600">\${site.recipes.length} recipes indexed</span></div>
-          <div class="flex gap-1">
+          <div class="truncate max-w-[240px]"><span class="font-bold">\${site.name}</span><br/><span class="text-slate-400">\${site.feedUrl}</span><br/><span class="text-emerald-600">\${site.recipes.length} recipes indexed</span></div>
+          <div class="flex gap-1 items-center">
             <button type="button" onclick="indexFeed(\${index})" class="bg-emerald-600 text-white px-2.5 py-1 rounded font-medium">Index</button>
             <button type="button" onclick="removeSite(\${index})" class="bg-red-100 text-red-700 px-2 py-1 rounded"><i class="fa-solid fa-trash"></i></button>
           </div>
@@ -124,9 +124,9 @@ const HTML_CONTENT = `<!DOCTYPE html>
     function addCustomSite(e) {
       e.preventDefault();
       const name = document.getElementById('new-site-name').value.trim();
-      const url = document.getElementById('new-site-url').value.trim();
-      if (name && url) {
-        savedSites.push({ name, url, recipes: [] });
+      const feedUrl = document.getElementById('new-site-feed').value.trim();
+      if (name && feedUrl) {
+        savedSites.push({ name, feedUrl, recipes: [] });
         saveSites();
         e.target.reset();
       }
@@ -145,13 +145,12 @@ const HTML_CONTENT = `<!DOCTYPE html>
       const site = savedSites[index];
       showNotification(\`Indexing \${site.name}...\`);
       try {
-        const res = await fetch(\`/?url=\${encodeURIComponent(site.url)}\`);
+        const res = await fetch(\`/?url=\${encodeURIComponent(site.feedUrl)}\`);
         const text = await res.text();
         const parser = new DOMParser();
         const xml = parser.parseFromString(text, 'text/xml');
         
         let extracted = [];
-        // Support RSS <item> or Atom <entry> or Sitemap <url>
         const items = xml.querySelectorAll('item, entry, url');
         items.forEach(node => {
           let title = node.querySelector('title')?.textContent;
@@ -214,12 +213,12 @@ const HTML_CONTENT = `<!DOCTYPE html>
       const grid = document.getElementById('results-grid');
       grid.innerHTML = '';
       if (results.length === 0) {
-        grid.innerHTML = '<p class="col-span-full text-slate-500 text-center py-10">No matching recipes found in indexed feeds.</p>';
+        grid.innerHTML = '<p class="col-span-full text-slate-500 text-center py-10">No matching recipes found in indexed feeds. Try indexing more sites or pasting a direct URL.</p>';
         return;
       }
       results.forEach((res) => {
         grid.innerHTML += \`<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-          <div class="h-44 w-full bg-slate-100 overflow-hidden"><img src="\res.image" class="w-full h-full object-cover"></div>
+          <div class="h-44 w-full bg-slate-100 overflow-hidden"><img src="\${res.image}" class="w-full h-full object-cover"></div>
           <div class="p-4 flex-grow flex flex-col justify-between">
             <div><span class="text-[10px] font-bold text-emerald-600 uppercase">\${res.source}</span><h3 class="text-base font-bold text-slate-800 mt-1 mb-2">\${res.title}</h3></div>
             <a href="\${res.url}" target="_blank" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white text-center py-2 rounded-lg font-semibold mt-2 transition">Open Original Site</a>
