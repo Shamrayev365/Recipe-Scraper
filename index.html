@@ -3,806 +3,236 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CleanRecipe - Distraction-Free Recipe Engine</title>
+  <title>CleanRecipe - Distraction-Free Recipe Search</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    .checkbox-custom:checked + label { text-decoration: line-through; opacity: 0.6; }
-    .recipe-expand-content {
-      display: grid;
-      grid-template-rows: 0fr;
-      transition: grid-template-rows 0.3s ease-out;
-    }
-    .recipe-expand-content.open {
-      grid-template-rows: 1fr;
-    }
-    .recipe-expand-inner {
-      overflow: hidden;
-    }
-  </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen font-sans pb-12">
+<body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
 
-  <!-- Header -->
-  <header class="bg-emerald-600 text-white shadow-md sticky top-0 z-50">
-    <div class="max-w-5xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
-      <div class="flex items-center space-x-3 cursor-pointer" onclick="showHome()">
-        <i class="fa-solid fa-utensils text-2xl text-emerald-200"></i>
+  <!-- Navigation -->
+  <header class="bg-emerald-700 text-white shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
         <h1 class="text-2xl font-bold tracking-tight">CleanRecipe</h1>
       </div>
-      
-      <!-- Search Bar -->
-      <form id="search-form" onsubmit="handleSearch(event)" class="w-full md:w-96 flex">
-        <input 
-          type="text" 
-          id="search-input" 
-          placeholder="Search all sites or paste URL..." 
-          class="w-full px-4 py-2 rounded-l-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-300 text-sm"
-          required
-        />
-        <button type="submit" class="bg-emerald-800 hover:bg-emerald-900 px-4 py-2 rounded-r-lg font-medium transition">
-          <i class="fa-solid fa-magnifying-glass"></i>
-        </button>
-      </form>
 
-      <!-- Header Controls -->
-      <div class="flex items-center space-x-4 w-full md:w-auto justify-between md:justify-end">
-        <button type="button" onclick="toggleUnits()" id="global-unit-toggle" class="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-3 py-1.5 rounded-lg transition border border-emerald-500">
-          Units: Metric
-        </button>
-        <button type="button" onclick="showLibrary()" class="flex items-center gap-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold px-4 py-2 rounded-lg transition text-sm">
-          <i class="fa-solid fa-book-bookmark"></i> My Library
-        </button>
+      <!-- Search Bar -->
+      <div class="w-full sm:w-96 flex">
+        <input type="text" id="searchInput" placeholder="Search saved recipes..." class="w-full px-4 py-2 text-slate-900 rounded-l-lg focus:outline-none" onkeyup="filterRecipes()">
+        <button class="bg-emerald-900 px-4 py-2 rounded-r-lg font-semibold hover:bg-emerald-950 transition">Search</button>
       </div>
+
+      <button onclick="toggleModal(true)" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Manage Sites
+      </button>
     </div>
   </header>
 
-  <!-- Main Container -->
-  <main class="max-w-5xl mx-auto px-4 mt-6">
-    
-    <!-- Saved Sites & Quick Launch Bar -->
-    <section id="sites-manager" class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
-      <div class="flex justify-between items-center mb-3">
-        <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-          <i class="fa-solid fa-globe text-emerald-600"></i> Saved Recipe Websites & Indexes
-        </h2>
-        <button type="button" onclick="toggleSitesModal(true)" class="text-xs bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1">
-          <i class="fa-solid fa-gear"></i> Manage & Index Sites
-        </button>
-      </div>
-      <div id="saved-sites-pills" class="flex flex-wrap gap-2 text-xs"></div>
-    </section>
-
-    <!-- Loading & Error States -->
-    <div id="loading" class="hidden text-center py-20">
-      <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-emerald-600 border-t-transparent mb-4"></div>
-      <p class="text-slate-600 font-medium text-lg" id="loading-text">Fetching recipe data...</p>
+  <!-- Main Content Container -->
+  <main class="max-w-6xl mx-auto px-4 py-8">
+    <div id="recipeGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Recipes rendered dynamically -->
     </div>
-    <div id="error" class="hidden bg-red-50 border-l-4 border-red-500 p-4 rounded shadow-sm my-6">
-      <div class="flex items-center">
-        <i class="fa-solid fa-circle-exclamation text-red-500 text-xl mr-3"></i>
-        <p class="text-red-700 font-medium" id="error-message"></p>
-      </div>
-    </div>
-
-    <!-- Notification Banner -->
-    <div id="notification" class="fixed bottom-4 right-4 bg-emerald-800 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50">
-      Notification
-    </div>
-
-    <!-- Results/Library Grid -->
-    <section id="main-view">
-      <h2 class="text-2xl font-bold mb-6 text-slate-700 hidden" id="view-title">Search Results</h2>
-      <div id="results-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min"></div>
-    </section>
-
   </main>
 
-  <!-- Modal for Managing & Indexing Websites -->
-  <div id="sites-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] flex flex-col">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-sliders text-emerald-600 mr-2"></i>Manage & Index Websites</h3>
-        <button type="button" onclick="toggleSitesModal(false)" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
-      </div>
-      
-      <form onsubmit="addCustomSite(event)" class="mb-6 bg-slate-50 p-3 rounded-lg border border-slate-200 shrink-0">
-        <p class="text-xs font-semibold text-slate-600 mb-2">Add New Website & Feed/Sitemap</p>
-        <div class="space-y-2">
-          <input type="text" id="new-site-name" placeholder="Website Name (e.g. Serious Eats)" class="w-full px-3 py-1.5 border rounded text-xs focus:ring-2 focus:ring-emerald-500 outline-none" required />
-          <input type="url" id="new-site-url" placeholder="Main URL (https://www.seriouseats.com)" class="w-full px-3 py-1.5 border rounded text-xs focus:ring-2 focus:ring-emerald-500 outline-none" required />
-          <input type="url" id="new-site-feed" placeholder="RSS or Recipe Index URL (optional)" class="w-full px-3 py-1.5 border rounded text-xs focus:ring-2 focus:ring-emerald-500 outline-none" />
-          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-1.5 rounded text-xs transition">Add Website</button>
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-4 right-4 bg-emerald-800 text-white px-6 py-3 rounded-lg shadow-lg hidden transition-opacity duration-300"></div>
+
+  <!-- Manage Sites Modal -->
+  <div id="siteModal" class="fixed inset-0 bg-slate-900/50 hidden backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 relative">
+      <button onclick="toggleModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">✕</button>
+      <h2 class="text-xl font-bold text-slate-900 mb-4">Manage Saved Sites & Feeds</h2>
+
+      <!-- Add Site Form -->
+      <form onsubmit="handleAddSite(event)" class="space-y-3 mb-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Site Name</label>
+          <input type="text" id="siteName" required placeholder="BBC Good Food" class="w-full px-3 py-2 border rounded-md text-sm">
         </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Main Website URL</label>
+          <input type="url" id="siteMainUrl" required placeholder="https://www.bbcgoodfood.com" class="w-full px-3 py-2 border rounded-md text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">RSS/Atom Feed URL</label>
+          <input type="url" id="siteFeedUrl" required placeholder="https://www.bbcgoodfood.com/feed/atom" class="w-full px-3 py-2 border rounded-md text-sm">
+        </div>
+        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-md font-medium text-sm transition">Add Website</button>
       </form>
 
-      <h4 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">Saved Websites & Indexes</h4>
-      <ul id="modal-sites-list" class="space-y-2 overflow-y-auto pr-1 flex-grow"></ul>
-      
-      <div class="mt-6 text-right shrink-0">
-        <button type="button" onclick="toggleSitesModal(false)" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold px-4 py-2 rounded-lg">Done</button>
+      <!-- Saved Sites List -->
+      <div id="siteList" class="space-y-3 max-h-60 overflow-y-auto">
+        <!-- Site items rendered dynamically -->
       </div>
     </div>
   </div>
 
   <script>
-    // --- Global State & Safe Storage Initialization ---
-    let isMetric = true;
-    let myLibrary = [];
-    try {
-      const storedLib = localStorage.getItem('clean_recipe_library');
-      if (storedLib) {
-        const parsed = JSON.parse(storedLib);
-        if (Array.isArray(parsed)) myLibrary = parsed;
-      }
-    } catch (e) {
-      myLibrary = [];
-    }
-    
-    let currentRenderedCards = []; 
-
     const DEFAULT_SITES = [
-      { name: "BBC Good Food", url: "https://www.bbcgoodfood.com", feed: "https://www.bbcgoodfood.com/rss", recipes: [] },
-      { name: "Serious Eats", url: "https://www.seriouseats.com", feed: "https://www.seriouseats.com/rss", recipes: [] },
-      { name: "Allrecipes", url: "https://www.allrecipes.com", feed: "https://www.allrecipes.com/rss", recipes: [] }
+      { id: 'bbc', name: 'BBC Good Food', mainUrl: 'https://www.bbcgoodfood.com', feedUrl: 'https://www.bbcgoodfood.com/feed/atom' },
+      { id: 'serious-eats', name: 'Serious Eats', mainUrl: 'https://www.seriouseats.com', feedUrl: 'https://www.seriouseats.com/rss' },
+      { id: 'allrecipes', name: 'Allrecipes', mainUrl: 'https://www.allrecipes.com', feedUrl: 'https://www.allrecipes.com/feed/atom' },
+      { id: 'conn-veg', name: 'Connoisseurus Veg', mainUrl: 'https://www.connoisseurusveg.com', feedUrl: 'https://www.connoisseurusveg.com/feed' }
     ];
 
-    let savedSites = DEFAULT_SITES;
-    try {
-      const storedSites = localStorage.getItem('clean_recipe_saved_sites');
-      if (storedSites) {
-        const parsed = JSON.parse(storedSites);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          savedSites = parsed;
-        }
-      }
-    } catch (e) {
-      savedSites = DEFAULT_SITES;
-    }
+    let sites = JSON.parse(localStorage.getItem('clean_sites')) || DEFAULT_SITES;
+    let recipes = JSON.parse(localStorage.getItem('clean_recipes')) || [];
 
     function saveSites() {
-      try {
-        localStorage.setItem('clean_recipe_saved_sites', JSON.stringify(savedSites));
-        renderSitesPills();
-        renderModalSitesList();
-      } catch(e) {
-        console.error("Error saving sites:", e);
-      }
+      localStorage.setItem('clean_sites', JSON.stringify(sites));
     }
 
-    function renderSitesPills() {
-      try {
-        const container = document.getElementById('saved-sites-pills');
-        if (!container) return;
-        container.innerHTML = '';
-        savedSites.forEach(site => {
-          const count = site && site.recipes ? site.recipes.length : 0;
-          const btn = document.createElement('a');
-          btn.href = site.url || '#'; btn.target = "_blank";
-          btn.className = "bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 border border-slate-200 px-3 py-1 rounded-full transition flex items-center gap-1.5";
-          btn.innerHTML = `<i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> ${site.name || 'Site'} <span class="bg-emerald-100 text-emerald-800 text-[9px] px-1.5 rounded-full font-bold">${count} indexed</span>`;
-          container.appendChild(btn);
-        });
-      } catch(e) {
-        console.error("Error rendering pills:", e);
-      }
+    function toggleModal(show) {
+      document.getElementById('siteModal').classList.toggle('hidden', !show);
+      if (show) renderSiteList();
     }
 
-    function renderModalSitesList() {
-      try {
-        const list = document.getElementById('modal-sites-list');
-        if (!list) return;
-        list.innerHTML = '';
-        savedSites.forEach((site, index) => {
-          if (!site) return;
-          const count = site.recipes ? site.recipes.length : 0;
-          list.innerHTML += `
-            <li class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 p-2.5 rounded text-xs border border-slate-200 gap-2">
-              <div>
-                <span class="font-bold text-slate-800">${site.name || 'Site'}</span>
-                <span class="text-slate-400 block text-[10px]">${site.url || ''}</span>
-                <span class="text-emerald-600 font-medium text-[10px]">${count} recipes indexed</span>
-              </div>
-              <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
-                <button type="button" onclick="indexWebsite(${index})" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded font-medium transition flex items-center gap-1">
-                  <i class="fa-solid fa-rotate"></i> Index
-                </button>
-                <button type="button" onclick="removeSite(${index})" class="bg-red-100 hover:bg-red-200 text-red-700 p-1.5 rounded transition"><i class="fa-solid fa-trash"></i></button>
-              </div>
-            </li>`;
-        });
-      } catch(e) {
-        console.error("Error rendering modal sites list:", e);
-      }
+    function showToast(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg transition-opacity duration-300 ${type === 'error' ? 'bg-red-700' : 'bg-emerald-800'} text-white`;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 4000);
     }
 
-    function addCustomSite(e) {
+    function handleAddSite(e) {
       e.preventDefault();
-      try {
-        const name = document.getElementById('new-site-name').value.trim();
-        const url = document.getElementById('new-site-url').value.trim();
-        const feed = document.getElementById('new-site-feed').value.trim();
-        if (name && url) { 
-          savedSites.push({ name, url, feed, recipes: [] }); 
-          saveSites(); 
-          e.target.reset(); 
-        }
-      } catch(e) {
-        console.error("Error adding custom site:", e);
-      }
+      const name = document.getElementById('siteName').value.trim();
+      const mainUrl = document.getElementById('siteMainUrl').value.trim();
+      const feedUrl = document.getElementById('siteFeedUrl').value.trim();
+
+      const newSite = { id: Date.now().toString(), name, mainUrl, feedUrl };
+      sites.push(newSite);
+      saveSites();
+      renderSiteList();
+      e.target.reset();
+      showToast(`Added ${name}`);
     }
 
-    function removeSite(index) { 
-      try {
-        savedSites.splice(index, 1); 
-        saveSites(); 
-      } catch(e) {
-        console.error("Error removing site:", e);
-      }
+    function deleteSite(id) {
+      sites = sites.filter(s => s.id !== id);
+      recipes = recipes.filter(r => r.siteId !== id);
+      saveSites();
+      localStorage.setItem('clean_recipes', JSON.stringify(recipes));
+      renderSiteList();
+      renderRecipes();
     }
 
-    function toggleSitesModal(show) { 
-      try {
-        const modal = document.getElementById('sites-modal');
-        if (modal) {
-          modal.classList.toggle('hidden', !show);
-        }
-      } catch(e) {
-        console.error("Error toggling modal:", e);
-      }
-    }
+    async function indexSite(siteId) {
+      const site = sites.find(s => s.id === siteId);
+      if (!site) return;
 
-    // --- Website Indexing Engine ---
-    async function indexWebsite(index) {
+      showToast(`Indexing ${site.name}...`);
+
       try {
-        const site = savedSites[index];
-        if (!site) return;
-        showNotification(`Indexing ${site.name}... Please wait.`);
-        
-        const targetUrl = site.feed || site.url;
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
         const res = await fetch(`/?url=${encodeURIComponent(site.feedUrl)}`);
-        if (!res.ok) throw new Error();
-        const text = await res.text();
+        if (!res.ok) throw new Error(`Server returned HTTP ${res.status}`);
 
+        const xmlText = await res.text();
         const parser = new DOMParser();
-        const doc = parser.parseFromString(text, 'text/html');
-        
-        let extractedRecipes = [];
+        const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
 
-        const items = doc.querySelectorAll('item, entry');
-        if (items.length > 0) {
-          items.forEach(item => {
-            const title = item.querySelector('title')?.textContent;
-            const link = item.querySelector('link')?.textContent || item.querySelector('link')?.getAttribute('href');
-            if (title && link) {
-              extractedRecipes.push({ title: title.trim(), url: link.trim(), source: site.name });
-            }
-          });
-        } else {
-          doc.querySelectorAll('a').forEach(a => {
-            const href = a.getAttribute('href');
-            const title = a.textContent?.trim();
-            if (href && title && title.length > 10 && (href.includes('recipe') || href.includes('food') || href.includes('dish'))) {
-              const fullUrl = href.startsWith('http') ? href : new URL(href, site.url).href;
-              if (!extractedRecipes.some(r => r.url === fullUrl)) {
-                extractedRecipes.push({ title, url: fullUrl, source: site.name });
-              }
-            }
-          });
+        if (xmlDoc.querySelector('parsererror')) {
+          throw new Error('Could not parse feed XML format.');
         }
 
-        site.recipes = extractedRecipes;
-        saveSites();
-        showNotification(`Successfully indexed ${extractedRecipes.length} recipes for ${site.name}!`);
-      } catch (e) {
-        showNotification(`Failed to index. Try adding a direct RSS feed URL.`);
-      }
-    }
+        // Support both RSS (<item>) and Atom (<entry>) nodes
+        const nodes = xmlDoc.querySelectorAll('item, entry');
+        let parsedRecipes = [];
 
-    // --- Metric Conversion Engine ---
-    const FRACTIONS = { '½': 0.5, '⅓': 0.333, '⅔': 0.666, '¼': 0.25, '¾': 0.75, '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875 };
-    function parseFraction(str) {
-      try {
-        let total = 0;
-        String(str).trim().split(' ').forEach(p => {
-          if (FRACTIONS[p]) total += FRACTIONS[p];
-          else if (p.includes('/')) { const [n, d] = p.split('/'); total += parseFloat(n)/parseFloat(d); }
-          else if (!isNaN(parseFloat(p))) total += parseFloat(p);
-        });
-        return total || null;
-      } catch(e) {
-        return null;
-      }
-    }
+        nodes.forEach(node => {
+          const title = node.querySelector('title')?.textContent?.trim() || '';
 
-    function convertIngredientToMetric(text) {
-      try {
-        if (!isMetric || !text) return text;
-        text = text.replace(/(\d+)\s*(?:°|degrees)?\s*F\b/gi, (m, f) => `${Math.round((parseInt(f) - 32) * (5/9))}°C`);
-        const unitRegex = /([\d\s\/½⅓⅔¼¾⅛⅜⅝⅞\.-]+)\s*(cups?|c\.|oz|ounces?|lbs?|pounds?|tbsp|tablespoons?|tsp|teaspoons?)\b/gi;
-        return text.replace(unitRegex, (match, amt, unit) => {
-          const val = parseFraction(amt);
-          if (!val) return match;
-          unit = unit.toLowerCase();
-          if (unit.startsWith('cup') || unit === 'c.') return `${Math.round(val * 240)} ml`;
-          if (unit.startsWith('tbsp')) return `${Math.round(val * 15)} ml`;
-          if (unit.startsWith('tsp')) return `${Math.round(val * 5)} ml`;
-          if (unit.startsWith('lb') || unit.startsWith('pound')) return `${Math.round(val * 453.6)} g`;
-          if (unit.startsWith('oz') || unit.startsWith('ounce')) return `${Math.round(val * 28.35)} g`;
-          return match;
-        });
-      } catch(e) {
-        return text;
-      }
-    }
-
-    function toggleUnits() {
-      try {
-        isMetric = !isMetric;
-        const toggleBtn = document.getElementById('global-unit-toggle');
-        if (toggleBtn) toggleBtn.innerText = isMetric ? "Units: Metric" : "Units: Original";
-        currentRenderedCards.forEach((res, index) => {
-          const expandedContent = document.getElementById(`expand-content-${index}`);
-          if (expandedContent && expandedContent.classList.contains('open')) {
-              renderIngredientsList(index, res.ingredients);
-              renderInstructionsList(index, res.instructions);
+          // Extract link: handles RSS (<link>url</link>) and Atom (<link href="url" />)
+          let link = '';
+          const linkEl = node.querySelector('link');
+          if (linkEl) {
+            link = linkEl.getAttribute('href') || linkEl.textContent?.trim() || '';
           }
-        });
-      } catch(e) {
-        console.error("Error toggling units:", e);
-      }
-    }
 
-    // --- Search & Fetch Logic ---
-    function showLoading(msg) {
-      try {
-        const loadingText = document.getElementById('loading-text');
-        if (loadingText) loadingText.innerText = msg;
-        const loadingEl = document.getElementById('loading');
-        if (loadingEl) loadingEl.classList.remove('hidden');
-        const errorEl = document.getElementById('error');
-        if (errorEl) errorEl.classList.add('hidden');
-        const grid = document.getElementById('results-grid');
-        if (grid) grid.innerHTML = '';
-        const title = document.getElementById('view-title');
-        if (title) title.classList.add('hidden');
-      } catch(e) {}
-    }
-    
-    function showError(msg) {
-      try {
-        const loadingEl = document.getElementById('loading');
-        if (loadingEl) loadingEl.classList.add('hidden');
-        const errMsg = document.getElementById('error-message');
-        if (errMsg) errMsg.innerText = msg;
-        const errorEl = document.getElementById('error');
-        if (errorEl) errorEl.classList.remove('hidden');
-      } catch(e) {}
-    }
-    
-    function showHome() {
-      try {
-        const sitesMgr = document.getElementById('sites-manager');
-        if (sitesMgr) sitesMgr.classList.remove('hidden');
-        const grid = document.getElementById('results-grid');
-        if (grid) grid.innerHTML = '';
-        const title = document.getElementById('view-title');
-        if (title) title.classList.add('hidden');
-        const searchInput = document.getElementById('search-input');
-        if (searchInput) searchInput.value = '';
-      } catch(e) {}
-    }
-
-    function showNotification(msg) {
-      try {
-        const notif = document.getElementById('notification');
-        if (!notif) return;
-        notif.innerText = msg;
-        notif.classList.remove('translate-y-20', 'opacity-0');
-        setTimeout(() => notif.classList.add('translate-y-20', 'opacity-0'), 4000);
-      } catch(e) {}
-    }
-
-    async function handleSearch(e) {
-      if (e) e.preventDefault();
-      try {
-        const searchInput = document.getElementById('search-input');
-        if (!searchInput) return;
-        const query = searchInput.value.trim().toLowerCase();
-        if (!query) return;
-
-        const sitesMgr = document.getElementById('sites-manager');
-        if (sitesMgr) sitesMgr.classList.remove('hidden');
-        
-        if (query.startsWith('http')) {
-          showLoading("Scraping direct URL...");
-          const result = await fetchRecipeFromUrl(query);
-          if (result) {
-            const loadingEl = document.getElementById('loading');
-            if (loadingEl) loadingEl.classList.add('hidden');
-            renderResultsGrid([result], "Direct URL Scrape", false);
-          }
-          return;
-        }
-
-        showLoading(`Searching recipes for "${query}" across all sources...`);
-        let results = [];
-
-        // 1. Search across user's indexed saved sites
-        if (Array.isArray(savedSites)) {
-          savedSites.forEach(site => {
-            if (site && Array.isArray(site.recipes)) {
-              site.recipes.forEach(rec => {
-                if (rec && rec.title && rec.title.toLowerCase().includes(query)) {
-                  results.push({
-                    id: rec.url ? btoa(rec.url).substring(0, 10) : Math.random().toString(),
-                    title: rec.title,
-                    source: site.name || "Saved Site",
-                    url: rec.url || '#',
-                    image: "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80",
-                    yield: "N/A", time: "N/A",
-                    ingredients: ["Click 'Open' to load ingredients from URL."],
-                    instructions: ["Click 'Open' to load instructions from URL."]
-                  });
-                }
-              });
-            }
-          });
-        }
-
-        // 2. Search TheMealDB API
-        try {
-          const apiRes = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(query)}`);
-          if (apiRes.ok) {
-            const apiData = await apiRes.json();
-            if (apiData && apiData.meals) {
-              apiData.meals.forEach(meal => {
-                const ingredients = [];
-                for (let i=1; i<=20; i++) {
-                  const ing = meal[`strIngredient${i}`];
-                  const mea = meal[`strMeasure${i}`];
-                  if (ing && ing.trim()) {
-                    ingredients.push(`${mea ? mea.trim() : ''} ${ing.trim()}`.trim());
-                  }
-                }
-                results.push({
-                  id: meal.idMeal ? String(meal.idMeal) : Math.random().toString(),
-                  title: meal.strMeal || "Untitled Meal",
-                  source: meal.strArea ? `${meal.strArea} Recipe` : "TheMealDB",
-                  url: meal.strSource || `https://www.themealdb.com/meal/${meal.idMeal}`,
-                  image: meal.strMealThumb || "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80",
-                  yield: "4 servings", 
-                  time: "30-45 mins",
-                  ingredients,
-                  instructions: meal.strInstructions ? meal.strInstructions.split(/\r?\n/).filter(s=>s.trim()) : [],
-                });
-              });
-            }
-          }
-        } catch(apiErr) {
-          console.warn("MealDB API search error:", apiErr);
-        }
-
-        const loadingEl = document.getElementById('loading');
-        if (loadingEl) loadingEl.classList.add('hidden');
-        
-        if (results.length > 0) {
-          renderResultsGrid(results, `Results for "${query}"`, false);
-        } else {
-          showError(`No recipes found matching "${query}". Try indexing more sites or pasting a direct URL.`);
-        }
-      } catch (err) {
-        console.error("Search error:", err);
-        showError("An error occurred during search. Please try again.");
-      }
-    }
-
-    async function fetchRecipeFromUrl(url) {
-      try {
-        const proxies = [`https://corsproxy.io/?${encodeURIComponent(url)}`, `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`];
-        let html;
-        for (const p of proxies) { 
-          try { 
-            const res = await fetch(p); 
-            if (res.ok) { html = await res.text(); break; } 
-          } catch(e){} 
-        }
-        if (!html) throw new Error();
-
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        let recipeData = null;
-        doc.querySelectorAll('script[type="application/ld+json"]').forEach(script => {
-          try {
-            const data = JSON.parse(script.innerText);
-            const items = Array.isArray(data) ? data : (data['@graph'] || [data]);
-            recipeData = recipeData || items.find(i => i && (i['@type'] === 'Recipe' || (Array.isArray(i['@type']) && i['@type'].includes('Recipe'))));
-          } catch(e){}
-        });
-
-        if (!recipeData) { 
-          return {
-            id: btoa(url).substring(0, 10),
-            title: doc.querySelector('h1')?.innerText || "Untitled Recipe",
-            url: url,
-            image: doc.querySelector('img')?.src || "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80",
-            source: new URL(url).hostname.replace('www.', ''),
-            yield: "N/A", time: "N/A",
-            ingredients: ["Could not automatically parse structured ingredients. Visit original site."],
-            instructions: ["Visit original site for instructions."]
-          };
-        }
-
-        let instructions = [];
-        if (recipeData.recipeInstructions) {
-          const raw = recipeData.recipeInstructions;
-          if (typeof raw === 'string') instructions = [raw];
-          else if (Array.isArray(raw)) {
-            raw.forEach(step => {
-              if (typeof step === 'string') instructions.push(step);
-              else if (step && step['@type'] === 'HowToStep') instructions.push(step.text);
-              else if (step && step['@type'] === 'HowToSection' && step.itemListElement) {
-                step.itemListElement.forEach(s => instructions.push(s.text || s));
-              }
+          if (title && link) {
+            parsedRecipes.push({
+              id: btoa(link).substring(0, 20),
+              siteId: site.id,
+              siteName: site.name,
+              title: title,
+              link: link,
+              date: new Date().toLocaleDateString()
             });
           }
-        }
-
-        let img = "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80";
-        if (recipeData.image) {
-          if (typeof recipeData.image === 'string') img = recipeData.image;
-          else if (Array.isArray(recipeData.image)) img = recipeData.image[0].url || recipeData.image[0];
-          else if (recipeData.image.url) img = recipeData.image.url;
-        }
-
-        return {
-          id: btoa(url).substring(0, 10),
-          title: recipeData.name || "Untitled",
-          url: url,
-          image: img,
-          source: new URL(url).hostname.replace('www.', ''),
-          yield: recipeData.recipeYield ? (Array.isArray(recipeData.recipeYield) ? recipeData.recipeYield[0] : recipeData.recipeYield) : "N/A",
-          time: recipeData.totalTime ? String(recipeData.totalTime).replace('PT','').toLowerCase() : "N/A",
-          ingredients: recipeData.recipeIngredient || [],
-          instructions: instructions
-        };
-      } catch (e) {
-        showError("Failed to fetch page. Ensure the URL is correct and public.");
-        return null;
-      }
-    }
-
-    // --- Render Grid & Expand Logic ---
-    function renderResultsGrid(results, titleStr, isLibraryView) {
-      try {
-        currentRenderedCards = Array.isArray(results) ? results : [];
-        const title = document.getElementById('view-title');
-        if (title) {
-          title.innerText = titleStr;
-          title.classList.remove('hidden');
-        }
-        
-        const grid = document.getElementById('results-grid');
-        if (!grid) return;
-        grid.innerHTML = '';
-
-        if (!currentRenderedCards.length) {
-          grid.innerHTML = '<p class="col-span-full text-slate-500 text-center py-10">No recipes found here.</p>';
-          return;
-        }
-
-        currentRenderedCards.forEach((res, index) => {
-          if (!res) return;
-          const id = res.id || `recipe-${index}`;
-          const titleText = res.title || "Untitled Recipe";
-          const sourceText = res.source || "Unknown";
-          const imageUrl = res.image || "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=800&q=80";
-          const timeText = res.time || "N/A";
-          
-          const card = document.createElement('div');
-          card.className = "bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-300 flex flex-col";
-          card.id = `recipe-card-${index}`;
-
-          const isSaved = myLibrary.some(r => r && r.id === id);
-          const actionButtonHtml = isLibraryView 
-              ? `<button type="button" onclick="removeFromLibrary('${id}')" class="shrink-0 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition"><i class="fa-solid fa-trash"></i> Remove</button>`
-              : `<button type="button" onclick="saveToLibrary(${index})" class="shrink-0 ${isSaved ? 'bg-slate-200 text-slate-500' : 'bg-slate-800 hover:bg-black text-white'} text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition" ${isSaved ? 'disabled' : ''}><i class="fa-solid fa-bookmark"></i> ${isSaved ? 'Saved' : 'Save'}</button>`;
-
-          card.innerHTML = `
-            <div class="cursor-pointer group flex flex-col" onclick="onCardClick(${index})">
-              <div class="h-44 w-full bg-slate-100 overflow-hidden relative">
-                <img src="${imageUrl}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" alt="${titleText}">
-                <div class="absolute inset-0 bg-black/10 group-hover:bg-transparent transition duration-300"></div>
-              </div>
-              <div class="p-4 flex-grow flex flex-col justify-between">
-                <div>
-                  <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">${sourceText}</span>
-                  <h3 class="text-base font-bold text-slate-800 mt-1 mb-2 leading-tight line-clamp-2">${titleText}</h3>
-                </div>
-                <div class="text-xs text-slate-500 flex items-center justify-between mt-2">
-                  <span><i class="fa-solid fa-clock"></i> ${timeText}</span>
-                  <span id="expand-icon-${index}" class="text-emerald-600 bg-emerald-50 px-2 py-1 rounded transition"><i class="fa-solid fa-chevron-down"></i> Open</span>
-                </div>
-              </div>
-            </div>
-            
-            <div id="expand-content-${index}" class="recipe-expand-content border-t border-slate-100 bg-slate-50">
-              <div class="recipe-expand-inner">
-                <div class="p-4 md:p-6">
-                  <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6 pb-4 border-b border-slate-200">
-                    <div>
-                      <h2 class="text-xl md:text-2xl font-extrabold text-slate-800">${titleText}</h2>
-                      <p class="text-xs md:text-sm text-slate-600 mt-1">
-                        Source: <a href="${res.url || '#'}" target="_blank" class="text-emerald-600 underline font-semibold">${sourceText}</a> 
-                        | Yields: <span id="res-yield-${index}">${res.yield || 'N/A'}</span>
-                      </p>
-                    </div>
-                    ${actionButtonHtml}
-                  </div>
-                  
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="md:col-span-1 bg-white p-4 rounded-lg border border-slate-200 shadow-sm h-fit">
-                      <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-sm"><i class="fa-solid fa-basket-shopping text-emerald-600 mr-2"></i>Ingredients</h3>
-                      <ul id="ing-list-${index}" class="space-y-2"></ul>
-                    </div>
-                    <div class="md:col-span-2">
-                      <h3 class="font-bold text-slate-800 mb-3 border-b pb-2 text-sm"><i class="fa-solid fa-list-check text-emerald-600 mr-2"></i>Instructions</h3>
-                      <ol id="inst-list-${index}" class="space-y-3"></ol>
-                    </div>
-                  </div>
-                  
-                  <div class="mt-6 text-center">
-                    <button type="button" onclick="toggleRecipeExpand(${index})" class="text-sm text-slate-500 hover:text-slate-800 font-semibold px-4 py-2 bg-slate-200 rounded-lg transition">Close Recipe</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          `;
-          grid.appendChild(card);
         });
+
+        // Merge recipes into local storage uniquely by link ID
+        const otherRecipes = recipes.filter(r => r.siteId !== site.id);
+        recipes = [...otherRecipes, ...parsedRecipes];
+        localStorage.setItem('clean_recipes', JSON.stringify(recipes));
+
+        renderSiteList();
+        renderRecipes();
+        showToast(`Successfully indexed ${parsedRecipes.length} recipes for ${site.name}!`);
+
       } catch (err) {
-        console.error("Error rendering grid:", err);
+        console.error('Indexing failed:', err);
+        showToast(`Failed to index ${site.name}: ${err.message}`, 'error');
       }
     }
 
-    async function onCardClick(index) {
-      try {
-        const res = currentRenderedCards[index];
-        if (!res) return;
-        if (Array.isArray(res.ingredients) && res.ingredients.length === 1 && String(res.ingredients[0]).includes("Click 'Open'")) {
-          showNotification("Fetching full recipe details...");
-          const fullData = await fetchRecipeFromUrl(res.url);
-          if (fullData) {
-            currentRenderedCards[index] = { ...res, ...fullData };
-          }
-        }
-        toggleRecipeExpand(index);
-      } catch(e) {
-        console.error("Error on card click:", e);
+    function renderSiteList() {
+      const listEl = document.getElementById('siteList');
+      listEl.innerHTML = sites.map(site => {
+        const count = recipes.filter(r => r.siteId === site.id).length;
+        return `
+          <div class="flex items-center justify-between p-3 bg-slate-100 rounded-lg border border-slate-200">
+            <div>
+              <h4 class="font-semibold text-slate-900 text-sm">${site.name}</h4>
+              <p class="text-xs text-slate-500">${count} recipes indexed</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="indexSite('${site.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-medium transition">Index</button>
+              <button onclick="deleteSite('${site.id}')" class="text-red-600 hover:text-red-800 p-1 text-xs">Delete</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderRecipes(items = recipes) {
+      const grid = document.getElementById('recipeGrid');
+      if (items.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full text-center py-12 text-slate-500">
+            No recipes indexed yet. Open <strong>Manage Sites</strong> and click <strong>Index</strong> to pull recipes from your feeds.
+          </div>
+        `;
+        return;
       }
+
+      grid.innerHTML = items.map(recipe => `
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+          <div>
+            <span class="text-xs font-semibold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-1 rounded">${recipe.siteName}</span>
+            <h3 class="font-bold text-slate-900 mt-2 text-lg line-clamp-2">${recipe.title}</h3>
+          </div>
+          <a href="${recipe.link}" target="_blank" rel="noopener noreferrer" class="mt-4 inline-flex items-center justify-center gap-1 bg-slate-900 hover:bg-slate-800 text-white text-sm py-2 px-4 rounded-lg font-medium transition">
+            View Recipe
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          </a>
+        </div>
+      `).join('');
     }
 
-    function toggleRecipeExpand(index) {
-      try {
-        const content = document.getElementById(`expand-content-${index}`);
-        const icon = document.getElementById(`expand-icon-${index}`);
-        const card = document.getElementById(`recipe-card-${index}`);
-        const res = currentRenderedCards[index];
-        if (!content || !card || !res) return;
-
-        if (content.classList.contains('open')) {
-          content.classList.remove('open');
-          card.classList.remove('md:col-span-2', 'lg:col-span-3');
-          if (icon) icon.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Open';
-        } else {
-          content.classList.add('open');
-          card.classList.add('md:col-span-2', 'lg:col-span-3');
-          if (icon) icon.innerHTML = '<i class="fa-solid fa-chevron-up"></i> Close';
-          
-          const yieldEl = document.getElementById(`res-yield-${index}`);
-          if (yieldEl) yieldEl.innerText = res.yield || 'N/A';
-          renderIngredientsList(index, res.ingredients || []);
-          renderInstructionsList(index, res.instructions || []);
-          
-          setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
-        }
-      } catch(e) {
-        console.error("Error expanding recipe:", e);
-      }
+    function filterRecipes() {
+      const query = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = recipes.filter(r => r.title.toLowerCase().includes(query) || r.siteName.toLowerCase().includes(query));
+      renderRecipes(filtered);
     }
 
-    function renderIngredientsList(index, ingredients) {
-      try {
-        const ul = document.getElementById(`ing-list-${index}`);
-        if (!ul) return;
-        ul.innerHTML = '';
-        if (!Array.isArray(ingredients)) return;
-        ingredients.forEach(ing => {
-          const li = document.createElement('li');
-          li.className = "text-slate-700 text-xs flex items-start space-x-2";
-          li.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500 mt-0.5 text-[10px]"></i> <span>${convertIngredientToMetric(ing)}</span>`;
-          ul.appendChild(li);
-        });
-      } catch(e) {}
-    }
-
-    function renderInstructionsList(index, instructions) {
-      try {
-        const ol = document.getElementById(`inst-list-${index}`);
-        if (!ol) return;
-        ol.innerHTML = '';
-        if (!Array.isArray(instructions)) return;
-        instructions.forEach((step, idx) => {
-          const li = document.createElement('li');
-          li.className = "flex items-start space-x-3";
-          li.innerHTML = `
-            <input type="checkbox" id="step-${index}-${idx}" class="checkbox-custom mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0">
-            <label for="step-${index}-${idx}" class="text-slate-700 text-sm leading-relaxed cursor-pointer select-none">${convertIngredientToMetric(step)}</label>
-          `;
-          ol.appendChild(li);
-        });
-      } catch(e) {}
-    }
-
-    // --- Library Management ---
-    function saveToLibrary(index) {
-      try {
-        const recipe = currentRenderedCards[index];
-        if (!recipe) return;
-        if (!myLibrary.some(r => r && r.id === recipe.id)) {
-            myLibrary.push(recipe);
-            localStorage.setItem('clean_recipe_library', JSON.stringify(myLibrary));
-            
-            const card = document.getElementById(`recipe-card-${index}`);
-            if (card) {
-              const btn = card.querySelector('button[onclick^="saveToLibrary"]');
-              if (btn) {
-                btn.className = "shrink-0 bg-slate-200 text-slate-500 text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition";
-                btn.innerHTML = '<i class="fa-solid fa-bookmark"></i> Saved';
-                btn.disabled = true;
-              }
-            }
-            showNotification("Recipe saved to your Library!");
-        }
-      } catch(e) {
-        console.error("Error saving to library:", e);
-      }
-    }
-
-    function removeFromLibrary(id) {
-      try {
-        myLibrary = myLibrary.filter(r => r && r.id !== id);
-        localStorage.setItem('clean_recipe_library', JSON.stringify(myLibrary));
-        showNotification("Recipe removed.");
-        showLibrary();
-      } catch(e) {
-        console.error("Error removing from library:", e);
-      }
-    }
-
-    function showLibrary() {
-      try {
-        const sitesMgr = document.getElementById('sites-manager');
-        if (sitesMgr) sitesMgr.classList.add('hidden');
-        const loadingEl = document.getElementById('loading');
-        if (loadingEl) loadingEl.classList.add('hidden');
-        const errorEl = document.getElementById('error');
-        if (errorEl) errorEl.classList.add('hidden');
-        const searchInput = document.getElementById('search-input');
-        if (searchInput) searchInput.value = '';
-        renderResultsGrid(myLibrary, "My Recipe Library", true);
-      } catch(e) {
-        console.error("Error showing library:", e);
-      }
-    }
-
-    // Initialize UI on load
-    try {
-      renderSitesPills();
-      renderModalSitesList();
-    } catch(e) {
-      console.error("Initialization error:", e);
-    }
+    // Initial load
+    renderRecipes();
   </script>
 </body>
 </html>
