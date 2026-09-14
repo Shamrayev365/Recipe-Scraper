@@ -261,7 +261,7 @@
         
         const targetUrl = site.feed || site.url;
         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-        const res = await fetch(proxyUrl);
+        const res = await fetch(`/?url=${encodeURIComponent(site.feedUrl)}`);
         if (!res.ok) throw new Error();
         const text = await res.text();
 
